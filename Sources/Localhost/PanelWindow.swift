@@ -52,7 +52,12 @@ enum PanelWindow {
                 expandAll ? $0.prominence == .system : $0.prominence == .devServer
             })?.id,
             highlightFooter: !expandAll,
-            initiallyExpanded: expandAll ? [.application, .system] : []))
+            initiallyExpanded: expandAll ? [.application, .system] : [],
+            // Second dev row hovered, first selected: the two states side by
+            // side is the whole point of looking at this.
+            forceHoverOn: expandAll ? nil : store.rows
+                .filter { $0.prominence == .devServer }
+                .dropFirst().first?.id))
         hosting.frame = panel.contentRect(forFrameRect: panel.frame)
         hosting.autoresizingMask = [.width, .height]
         panel.contentView = hosting

@@ -24,7 +24,8 @@ public struct MenuContent: View {
         maximumListHeight: CGFloat = 520,
         initialSelection: Listener.ID? = nil,
         highlightFooter: Bool = false,
-        initiallyExpanded: Set<ListenerPresentation.Prominence> = []
+        initiallyExpanded: Set<ListenerPresentation.Prominence> = [],
+        forceHoverOn: Listener.ID? = nil
     ) {
         _store = State(initialValue: store)
         self.scans = scans
@@ -32,9 +33,11 @@ public struct MenuContent: View {
         _selection = State(initialValue: initialSelection)
         _expanded = State(initialValue: initiallyExpanded)
         self.highlightFooter = highlightFooter
+        self.forceHoverOn = forceHoverOn
     }
 
     private let highlightFooter: Bool
+    private let forceHoverOn: Listener.ID?
 
     /// One confirmation path, so quitting one process and quitting a project
     /// cannot drift apart.
@@ -203,7 +206,7 @@ public struct MenuContent: View {
     }
 
     private var measuredRows: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Metrics.rowSpacing) {
             ForEach(sections) { section in
                 if section.project != nil {
                     SectionHeaderView(section: section) { pending = .project(section) }
@@ -212,7 +215,8 @@ public struct MenuContent: View {
                     ListenerRowView(
                         row: row,
                         isSelected: row.id == selection,
-                        inGroup: section.project != nil
+                        inGroup: section.project != nil,
+                        forceHovered: row.id == forceHoverOn
                     ) { action in
                         perform(action, on: row)
                     }
@@ -224,7 +228,11 @@ public struct MenuContent: View {
                     tierHeading(for: tier.prominence, title: tier.title, help: tier.help)
                     if reveals(tier.prominence) {
                         ForEach(rows(tier.prominence)) { row in
-                            ListenerRowView(row: row, isSelected: row.id == selection) { action in
+                            ListenerRowView(
+                                row: row,
+                                isSelected: row.id == selection,
+                                forceHovered: row.id == forceHoverOn
+                            ) { action in
                                 perform(action, on: row)
                             }
                         }
@@ -548,12 +556,17 @@ enum Metrics {
     /// Deliberately rounder than the panel appears to be. Erring high only
     /// pulls content inward; erring low lets it escape the window's shape.
     static let panelCornerRadius: CGFloat = 20
+    /// Vertical gap between rows, so two highlighted rows read as two things
+    /// rather than one block of colour.
+    static let rowSpacing: CGFloat = 2
     /// macOS 26's menus are much rounder than the 5pt of older releases, and a
     /// tight highlight inside a very round panel reads as a mismatch.
     static let rowCornerRadius: CGFloat = 8
     static let controlCornerRadius: CGFloat = 8
-    /// How far a highlight sits in from the panel edge.
-    static let rowInset: CGFloat = 6
+    /// How far a highlight sits in from the panel edge. Generous on purpose:
+    /// a fill that runs close to the edge reads as a banner rather than as a
+    /// row, and leaves the panel looking heavier than it is.
+    static let rowInset: CGFloat = 9
 }
 
 private struct ContentHeightKey: PreferenceKey {

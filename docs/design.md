@@ -377,6 +377,26 @@ default terminal, so that list is a known set filtered by what is installed; a
 remembered app that has since been deleted falls back rather than stranding the
 row.
 
+### Selection, hover, and weight
+
+Hover and selection shared one appearance, so the pointer resting on one row
+while another was selected lit up both in full accent blue. Two selections, in
+a list of two.
+
+They are now separate states with separate fills, and neither is dark:
+
+- **Hover** — the unemphasized selection grey, softened. "Under the pointer."
+- **Selected** — the accent colour at 18%. "This one."
+
+Both are tints rather than fills, and text keeps its ordinary colours. A solid
+accent under two lines — project, branch, framework, version — flattens all of
+it to white and makes a two-row list look like a dialog. Tinting keeps the
+hierarchy and still separates the two states by hue.
+
+Rows sit 9pt in from the panel edge with a 2pt gap between them, so a highlight
+reads as a row rather than a banner, and two adjacent highlights read as two
+things.
+
 ### Corner geometry
 
 Rows highlight edge to edge, so against a rounded panel a highlight can draw

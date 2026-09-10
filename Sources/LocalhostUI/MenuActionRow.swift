@@ -31,14 +31,14 @@ struct MenuActionRow: View {
                 Text(title)
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(highlighted
-                ? AnyShapeStyle(Color(nsColor: .alternateSelectedControlTextColor))
-                : AnyShapeStyle(.primary))
+            .foregroundStyle(.primary)
             .padding(.horizontal, 12)
             .padding(.vertical, 4)
             .background(
                 RoundedRectangle(cornerRadius: Metrics.rowCornerRadius, style: .continuous)
-                    .fill(highlighted ? Color(nsColor: .selectedContentBackgroundColor) : .clear)
+                    .fill(highlighted
+                        ? Color(nsColor: .unemphasizedSelectedContentBackgroundColor)
+                        : .clear)
                     .padding(.horizontal, Metrics.rowInset)
             )
             .contentShape(Rectangle())

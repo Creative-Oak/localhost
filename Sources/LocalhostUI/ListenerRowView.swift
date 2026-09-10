@@ -7,23 +7,60 @@ public struct ListenerRowView: View {
     /// Inside a project group the heading already carries the project name and
     /// branch, so the row says what it *is* instead of repeating them.
     var inGroup: Bool = false
+    /// Forces the hover appearance. Hover cannot be triggered in a headless
+    /// screenshot, and hover-versus-selection is precisely what needs looking at.
+    var forceHovered = false
     var onAction: (ListenerAction) -> Void = { _ in }
 
-    @State private var isHovered = false
+    @State private var hovering = false
 
-    /// Menus highlight under the pointer, not only under the keyboard, so
-    /// hover and selection share one appearance.
-    private var isHighlighted: Bool { isSelected || isHovered }
+    private var isHovered: Bool { hovering || forceHovered }
+
+    /// Hover and selection are different states and must look different.
+    ///
+    /// Sharing one appearance meant the pointer resting on one row while
+    /// another was selected lit up both in full accent blue, which reads as two
+    /// selections and makes a short list look loud. macOS already has the
+    /// vocabulary: the accent fill means "this is selected", and the
+    /// unemphasized fill means "this is merely under the pointer".
+    private enum Emphasis { case none, hover, selected }
+
+    private var emphasis: Emphasis {
+        if isSelected { return .selected }
+        return isHovered ? .hover : .none
+    }
+
+    /// Actions appear for either state — the pointer is how they are reached.
+    private var showsActions: Bool { emphasis != .none }
+
+    /// Both states are light, so text keeps its ordinary colours and the row
+    /// keeps its hierarchy. A solid accent fill under two lines of text — a
+    /// project, a branch, a framework, a version — flattens all of it to white
+    /// and makes a two-row list look like a dialog. A tint says "selected"
+    /// without shouting, and the accent-versus-grey difference still separates
+    /// selection from hover.
+    private var fill: Color {
+        switch emphasis {
+        case .none:
+            return .clear
+        case .hover:
+            return Color(nsColor: .unemphasizedSelectedContentBackgroundColor).opacity(0.7)
+        case .selected:
+            return Color(nsColor: .controlAccentColor).opacity(0.18)
+        }
+    }
 
     public init(
         row: ListenerPresentation,
         isSelected: Bool = false,
         inGroup: Bool = false,
+        forceHovered: Bool = false,
         onAction: @escaping (ListenerAction) -> Void = { _ in }
     ) {
         self.row = row
         self.isSelected = isSelected
         self.inGroup = inGroup
+        self.forceHovered = forceHovered
         self.onAction = onAction
     }
 
@@ -33,14 +70,9 @@ public struct ListenerRowView: View {
         .openInBrowser, .openInTerminal, .revealInFinder,
     ]
 
-    /// On a highlighted row every piece of text turns light, the way a system
-    /// menu does it. Leaving the second line `.secondary` puts grey on the
-    /// selection blue, which fails contrast and looks unfinished.
-    private var secondaryStyle: AnyShapeStyle {
-        isHighlighted
-            ? AnyShapeStyle(Color(nsColor: .alternateSelectedControlTextColor).opacity(0.8))
-            : AnyShapeStyle(.secondary)
-    }
+    /// Secondary text keeps its own colour: neither state is dark enough to
+    /// need light text, which is the point of tinting rather than filling.
+    private var secondaryStyle: AnyShapeStyle { AnyShapeStyle(.secondary) }
 
     /// The first line: what this row is, without repeating its heading.
     private var primary: String {
@@ -59,11 +91,7 @@ public struct ListenerRowView: View {
                 .font(.body.monospacedDigit())
                 .fontWeight(.medium)
                 .frame(width: 56, alignment: .trailing)
-                .foregroundStyle(process.isOurs
-                    ? (isHighlighted
-                        ? AnyShapeStyle(Color(nsColor: .alternateSelectedControlTextColor))
-                        : AnyShapeStyle(.primary))
-                    : secondaryStyle)
+                .foregroundStyle(process.isOurs ? AnyShapeStyle(.primary) : secondaryStyle)
 
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 5) {
@@ -88,9 +116,7 @@ public struct ListenerRowView: View {
                             // The system orange, so it stays correct in dark
                             // mode and under Increase Contrast — but on the
                             // selection fill it becomes light like everything else.
-                            .foregroundStyle(isHighlighted
-                                ? AnyShapeStyle(Color(nsColor: .alternateSelectedControlTextColor))
-                                : AnyShapeStyle(Color(nsColor: .systemOrange)))
+                            .foregroundStyle(Color(nsColor: .systemOrange))
                             .help("Bound to all interfaces — reachable from your network")
                     }
                 }
@@ -109,7 +135,7 @@ public struct ListenerRowView: View {
             // Nothing previously suggested a row was clickable, and the
             // useful destinations — the browser, a terminal, the folder —
             // were buried in a context menu nobody had reason to try.
-            if isHighlighted {
+            if showsActions {
                 HStack(spacing: 2) {
                     ForEach(Self.quickActions.filter(row.supports), id: \.self) { action in
                         Button {
@@ -125,7 +151,7 @@ public struct ListenerRowView: View {
                         .accessibilityLabel(action.title)
                     }
                 }
-                .foregroundStyle(Color(nsColor: .alternateSelectedControlTextColor).opacity(0.9))
+                .foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 4)
@@ -134,17 +160,15 @@ public struct ListenerRowView: View {
             // The highlight menus actually use, inset from the panel edge the
             // way NSMenu insets its own rows.
             RoundedRectangle(cornerRadius: Metrics.rowCornerRadius, style: .continuous)
-                .fill(isHighlighted ? Color(nsColor: .selectedContentBackgroundColor) : .clear)
+                .fill(fill)
                 .padding(.horizontal, Metrics.rowInset)
         )
-        .foregroundStyle(isHighlighted
-            ? AnyShapeStyle(Color(nsColor: .alternateSelectedControlTextColor))
-            : AnyShapeStyle(.primary))
-        .onHover { hovering in
-            isHovered = hovering
+        .foregroundStyle(.primary)
+        .onHover { inside in
+            hovering = inside
             // A pointing hand is the system's own signal that something opens.
             if row.supports(.openInBrowser) {
-                hovering ? NSCursor.pointingHand.push() : NSCursor.pop()
+                inside ? NSCursor.pointingHand.push() : NSCursor.pop()
             }
         }
         .contentShape(Rectangle())
