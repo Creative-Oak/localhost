@@ -94,7 +94,7 @@ struct ContainerLabelsTests {
 
         let rows = ListenerAttributor(containers: labels(returning: orbStack)).present([listener])
         #expect(rows.first?.label == "shop · api")
-        #expect(rows.first?.prominence == .yours)
+        #expect(rows.first?.prominence == .devServer)
     }
 }
 

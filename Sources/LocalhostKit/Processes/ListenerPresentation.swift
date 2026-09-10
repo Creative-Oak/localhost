@@ -26,14 +26,32 @@ public struct ListenerPresentation: Identifiable, Hashable, Sendable {
     /// The question this app exists to answer is "what has my port, and which
     /// project is it?". A daemon on a random high port is never the answer, and
     /// on a normal machine there are more of those than there are real ones.
-    public enum Prominence: Hashable, Sendable {
-        /// Something you started: a resolved project, a container, or one of
-        /// your own processes running a server we recognise.
-        case yours
-        /// Everything else — daemons, launchd-held sockets, other users'
-        /// processes, and services on ports nobody chose. Folded away, never
-        /// hidden, because "nothing is on 5000" would be a lie.
+    /// Three kinds of listener, because they answer different questions.
+    ///
+    /// Collapsing the last two into one "system" bucket put Raycast and Figma
+    /// beside Kerberos, which is wrong: those are your applications, running
+    /// as you, and you can quit them. A launchd-held socket is not.
+    public enum Prominence: Hashable, Sendable, CaseIterable {
+        /// Something you ran to work on: a resolved project, a container, or
+        /// your own process running a server we recognise.
+        case devServer
+        /// An application of yours that happens to listen — a launcher, a
+        /// sync client, an editor helper. Yours to quit, rarely interesting.
+        case application
+        /// The operating system: daemons, launchd-held sockets, and processes
+        /// belonging to other users. Not yours, and mostly not actionable.
         case system
+    }
+
+    /// Distinguishes an application from a piece of the operating system by
+    /// where its executable lives. A user's own `~/Library` is deliberately not
+    /// in this list — a helper inside `~/Library/Application Support` is still
+    /// an application of theirs.
+    private static let systemPrefixes = ["/System/", "/usr/", "/sbin/", "/bin/", "/Library/"]
+
+    static func isSystemExecutable(_ path: String?) -> Bool {
+        guard let path else { return true }   // unidentifiable: keep it out of the way
+        return systemPrefixes.contains { path.hasPrefix($0) }
     }
 
     public let listener: Listener
@@ -67,7 +85,7 @@ public struct ListenerPresentation: Identifiable, Hashable, Sendable {
         // A resolved project or a published container is the whole point of
         // the app, whatever the port.
         case .project, .container:
-            return .yours
+            return .devServer
 
         // AirPlay, Screen Sharing and Kerberos are worth explaining when
         // someone goes looking for the port, and worth nothing the rest of the
@@ -81,14 +99,16 @@ public struct ListenerPresentation: Identifiable, Hashable, Sendable {
             return .system
 
         case .nothing:
-            // No project, so the question is whether this looks like a server
-            // you ran. A recognised runtime on a port a person would choose is
-            // the evidence; a menu bar app that happens to listen is not.
-            guard listener.process.isOurs,
-                  runtime != nil,
-                  listener.port <= Self.highestChosenPort
-            else { return .system }
-            return .yours
+            guard listener.process.isOurs else { return .system }
+            // A recognised runtime on a port a person would choose is the
+            // evidence that this is a server you ran. Raycast is not that:
+            // it runs as you, on a low port, and argv says it is an app.
+            if runtime != nil, listener.port <= Self.highestChosenPort {
+                return .devServer
+            }
+            return Self.isSystemExecutable(listener.process.executablePath)
+                ? .system
+                : .application
         }
     }
 
@@ -114,8 +134,13 @@ public struct ListenerPresentation: Identifiable, Hashable, Sendable {
         switch attribution {
         case .project: return 0
         case .container: return 1
-        case .nothing, .unavailable: return prominence == .yours ? 2 : 4
-        case .knownDaemon: return 3
+        case .nothing, .unavailable:
+            switch prominence {
+            case .devServer: return 2
+            case .application: return 4
+            case .system: return 5
+            }
+        case .knownDaemon: return 5
         }
     }
 }

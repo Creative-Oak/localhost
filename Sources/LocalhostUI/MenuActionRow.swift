@@ -37,9 +37,9 @@ struct MenuActionRow: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 4)
             .background(
-                RoundedRectangle(cornerRadius: 5)
+                RoundedRectangle(cornerRadius: Metrics.rowCornerRadius, style: .continuous)
                     .fill(highlighted ? Color(nsColor: .selectedContentBackgroundColor) : .clear)
-                    .padding(.horizontal, 5)
+                    .padding(.horizontal, Metrics.rowInset)
             )
             .contentShape(Rectangle())
         }

@@ -114,9 +114,9 @@ public struct ListenerRowView: View {
         .background(
             // The highlight menus actually use, inset from the panel edge the
             // way NSMenu insets its own rows.
-            RoundedRectangle(cornerRadius: 5)
+            RoundedRectangle(cornerRadius: Metrics.rowCornerRadius, style: .continuous)
                 .fill(isHighlighted ? Color(nsColor: .selectedContentBackgroundColor) : .clear)
-                .padding(.horizontal, 5)
+                .padding(.horizontal, Metrics.rowInset)
         )
         .foregroundStyle(isHighlighted
             ? AnyShapeStyle(Color(nsColor: .alternateSelectedControlTextColor))

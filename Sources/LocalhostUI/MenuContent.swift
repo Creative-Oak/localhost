@@ -5,7 +5,7 @@ public struct MenuContent: View {
     @State private var store: ListenerStore
     /// Height of the row list, measured rather than assumed.
     @State private var contentHeight: CGFloat = 0
-    @State private var showsSystem = false
+    @State private var expanded: Set<ListenerPresentation.Prominence> = []
     @State private var query = ""
     @State private var selection: Listener.ID?
     @State private var pending: PendingTermination?
@@ -97,15 +97,17 @@ public struct MenuContent: View {
             case let .taken(row):
                 takenAnswer(row)
             case .notAPort:
-                if sections.isEmpty, system.isEmpty {
+                if visible.isEmpty {
                     emptyState
                 } else {
                     list
                 }
             }
 
-            if !system.isEmpty {
-                systemDisclosure
+            ForEach(foldedTiers, id: \.prominence) { tier in
+                if !rows(tier.prominence).isEmpty {
+                    disclosure(for: tier.prominence, title: tier.title, help: tier.help)
+                }
             }
 
             if let message = store.actionError {
@@ -156,17 +158,27 @@ public struct MenuContent: View {
 
     // MARK: - Rows
 
-    private var yours: [ListenerPresentation] {
-        ListenerSearch.filter(store.rows.filter { $0.prominence == .yours }, query: query)
+    private func rows(_ prominence: ListenerPresentation.Prominence) -> [ListenerPresentation] {
+        ListenerSearch.filter(store.rows.filter { $0.prominence == prominence }, query: query)
     }
 
-    private var system: [ListenerPresentation] {
-        ListenerSearch.filter(store.rows.filter { $0.prominence == .system }, query: query)
-    }
+    private var yours: [ListenerPresentation] { rows(.devServer) }
 
-    /// A search reaches everything. Hiding a match behind a disclosure would
+    /// A search reaches every tier. Hiding a match behind a disclosure would
     /// mean saying "nothing matches 5000" while AirPlay sits on it.
-    private var revealsSystem: Bool { showsSystem || !query.isEmpty }
+    private func reveals(_ prominence: ListenerPresentation.Prominence) -> Bool {
+        expanded.contains(prominence) || !query.isEmpty
+    }
+
+    /// The tiers that fold away, in the order they appear beneath the list.
+    private var foldedTiers: [(prominence: ListenerPresentation.Prominence, title: String, help: String)] {
+        [
+            (.application, "application",
+             "Applications of yours that happen to listen — launchers, sync clients, editor helpers"),
+            (.system, "system listener",
+             "Daemons, launchd-held sockets and processes belonging to other users"),
+        ]
+    }
 
     private var sections: [ListenerSection] {
         ListenerGrouping.sections(from: yours)
@@ -174,7 +186,7 @@ public struct MenuContent: View {
 
     /// Everything on screen, in the order the arrow keys should walk it.
     private var visible: [ListenerPresentation] {
-        revealsSystem ? yours + system : yours
+        yours + foldedTiers.flatMap { reveals($0.prominence) ? rows($0.prominence) : [] }
     }
 
     /// A scroll view appears only once the rows genuinely overflow.
@@ -210,10 +222,12 @@ public struct MenuContent: View {
                     .padding(.leading, section.project == nil ? 0 : 10)
                 }
             }
-            if revealsSystem {
-                ForEach(system) { row in
-                    ListenerRowView(row: row, isSelected: row.id == selection) { action in
-                        perform(action, on: row)
+            ForEach(foldedTiers, id: \.prominence) { tier in
+                if reveals(tier.prominence) {
+                    ForEach(rows(tier.prominence)) { row in
+                        ListenerRowView(row: row, isSelected: row.id == selection) { action in
+                            perform(action, on: row)
+                        }
                     }
                 }
             }
@@ -311,7 +325,7 @@ public struct MenuContent: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
+            RoundedRectangle(cornerRadius: Metrics.controlCornerRadius, style: .continuous)
                 .fill(.quaternary.opacity(0.6))
         )
         .padding(.horizontal, 10)
@@ -367,18 +381,28 @@ public struct MenuContent: View {
         .padding(.vertical, 10)
     }
 
-    /// Folded away, never hidden: telling someone nothing is on 44950 when
-    /// something is would be worse than the clutter.
-    private var systemDisclosure: some View {
-        Button {
-            withAnimation(.snappy(duration: 0.15)) { showsSystem.toggle() }
+    /// Folded away, never hidden: telling someone nothing is on 5000 when
+    /// AirPlay is would be worse than the clutter.
+    private func disclosure(
+        for prominence: ListenerPresentation.Prominence,
+        title: String,
+        help: String
+    ) -> some View {
+        let count = rows(prominence).count
+        let shown = reveals(prominence)
+        return Button {
+            withAnimation(.snappy(duration: 0.15)) {
+                if expanded.contains(prominence) {
+                    expanded.remove(prominence)
+                } else {
+                    expanded.insert(prominence)
+                }
+            }
         } label: {
             HStack(spacing: 4) {
-                Image(systemName: revealsSystem ? "chevron.down" : "chevron.right")
+                Image(systemName: shown ? "chevron.down" : "chevron.right")
                     .font(.caption2)
-                Text(revealsSystem
-                     ? "Hide system listeners"
-                     : "\(system.count) system listeners")
+                Text(shown ? "Hide \(title)s" : "\(count) \(title)\(count == 1 ? "" : "s")")
                 Spacer()
             }
             .font(.caption)
@@ -388,10 +412,8 @@ public struct MenuContent: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("Daemons, launchd-held sockets and other users' processes — everything you did not start")
-        .accessibilityLabel(revealsSystem
-            ? "Hide system listeners"
-            : "Show \(system.count) system listeners")
+        .help(help)
+        .accessibilityLabel(shown ? "Hide \(title)s" : "Show \(count) \(title)s")
         .accessibilityAddTraits(.isButton)
     }
 
@@ -505,6 +527,19 @@ public struct MenuContent: View {
         case let .failed(reason): return "Port discovery failed. \(reason)"
         }
     }
+}
+
+/// Shared geometry, so the panel and its rows round consistently.
+enum Metrics {
+    /// Deliberately rounder than the panel appears to be. Erring high only
+    /// pulls content inward; erring low lets it escape the window's shape.
+    static let panelCornerRadius: CGFloat = 20
+    /// macOS 26's menus are much rounder than the 5pt of older releases, and a
+    /// tight highlight inside a very round panel reads as a mismatch.
+    static let rowCornerRadius: CGFloat = 8
+    static let controlCornerRadius: CGFloat = 8
+    /// How far a highlight sits in from the panel edge.
+    static let rowInset: CGFloat = 6
 }
 
 private struct ContentHeightKey: PreferenceKey {

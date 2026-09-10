@@ -98,7 +98,13 @@ enum Diagnostics {
             let name = row.listener.process.name
             let label = row.label.map { " → \($0)" } ?? ""
             let exposed = row.listener.isExposed ? "  [exposed]" : ""
-            print("\(port)  \(name)\(label)\(exposed)")
+            let tier: String
+            switch row.prominence {
+            case .devServer: tier = "dev "
+            case .application: tier = "app "
+            case .system: tier = "sys "
+            }
+            print("\(tier)\(port)  \(name)\(label)\(exposed)")
             if let advice = row.advice { print("        \(advice)") }
         }
     }

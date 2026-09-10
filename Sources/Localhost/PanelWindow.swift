@@ -40,7 +40,7 @@ enum PanelWindow {
         // the corner arc and drawing onto the desktop. Deliberately rounder
         // than the system's, so anything that would escape shows up here first.
         panel.contentView?.wantsLayer = true
-        panel.contentView?.layer?.cornerRadius = 18
+        panel.contentView?.layer?.cornerRadius = 20
         panel.contentView?.layer?.cornerCurve = .continuous
         panel.contentView?.layer?.masksToBounds = true
 
@@ -48,7 +48,7 @@ enum PanelWindow {
         let hosting = NSHostingView(rootView: MenuContent(
             store: store,
             scans: false,
-            initialSelection: store.rows.first(where: { $0.prominence == .yours })?.id,
+            initialSelection: store.rows.first(where: { $0.prominence == .devServer })?.id,
             highlightFooter: true))
         hosting.frame = panel.contentRect(forFrameRect: panel.frame)
         hosting.autoresizingMask = [.width, .height]

@@ -308,23 +308,46 @@ be neither compiled nor tested, so it would be guesswork. The work above is
 current-HIG and uses semantic materials and colours throughout, which is what
 carries forward.
 
-## Yours, and everything else
+## Three kinds of listener
 
-The first cut of this sorted by "would a developer type this port", which put
-AirPlay, Screen Sharing, Kerberos and Raycast permanently on screen. They are
-worth explaining when someone goes hunting for port 5000, and worth nothing the
-rest of the time.
+Sorting by "would a developer type this port" put AirPlay, Kerberos and Raycast
+permanently on screen. Collapsing everything else into one "system" bucket then
+put Raycast beside Kerberos, which is also wrong — Raycast is *your*
+application, running as you, and you can quit it. A launchd-held socket is not.
 
-A row is **yours** if it resolved to a project or a container, or if it is one
-of your own processes running a runtime we recognise on a port a person would
-choose. Everything else is **system**, folded behind one disclosure. The
-distinction that does the work is the runtime: Raycast runs as you, on a low
-port, and is never what you opened the panel to find — but it is not a server,
-and argv says so.
+- **Dev server** — a resolved project, a published container, or one of your
+  own processes running a runtime we recognise on a port a person would choose.
+- **Application** — yours, but not a server: launchers, sync clients, editor
+  helpers. Yours to quit, rarely interesting.
+- **System** — daemons, launchd-held sockets, and other users' processes.
 
-Search reaches both tiers regardless of the disclosure. Answering "nothing
-matches 5000" while AirPlay sits on it would be a lie of exactly the kind the
-folding is meant to avoid.
+Two signals do the work. The runtime separates a dev server from an
+application: Raycast runs as you on a low port, but argv says it is an app, not
+a server. And the executable's location separates an application from the
+operating system: `rapportd` runs as you but lives in `/usr/libexec`. A user's
+own `~/Library` is deliberately *not* a system location, so a helper inside
+`~/Library/Application Support` stays an application.
+
+Search reaches every tier regardless of the disclosures. Answering "nothing
+matches 5000" while AirPlay sits on it would be the same lie the folding avoids.
+
+### Corner geometry
+
+Rows highlight edge to edge, so against a rounded panel a highlight can draw
+outside the window's shape. Two things prevent it, and the first is the one
+that matters: **the panel keeps material below its last row**, so a highlight
+never reaches the corner at all.
+
+The clip behind it is a backstop, and its radius must be *at least* the
+window's. This was got backwards once: a smaller radius is a squarer — and
+therefore larger — shape, so clipping content at 11pt against a ~16pt window
+left it free to escape exactly as before. Over-rounding is the safe direction,
+because the material sits outside the clip and still fills the window; rounding
+the content further can only pull highlights inward, never expose a gap.
+
+macOS 26's menus are far rounder than older releases, so rows round at 8pt
+rather than the 5pt that used to be right. A tight highlight inside a very
+round panel reads as a mismatch.
 
 ## Performance
 

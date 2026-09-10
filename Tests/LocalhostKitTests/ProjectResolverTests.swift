@@ -222,7 +222,12 @@ struct AttributionTests {
 @Suite("Prominence")
 struct ProminenceTests {
     private func row(
-        port: UInt16, name: String, cwd: String?, arguments: [String]? = nil, ours: Bool = true
+        port: UInt16,
+        name: String,
+        cwd: String?,
+        executable: String? = nil,
+        arguments: [String]? = nil,
+        ours: Bool = true
     ) -> Listener {
         Listener(
             port: port,
@@ -233,6 +238,7 @@ struct ProminenceTests {
                 startedAt: ours ? 1 : nil,
                 uid: ours ? getuid() : 0,
                 name: name,
+                executablePath: executable,
                 arguments: arguments,
                 workingDirectory: cwd))
     }
@@ -247,7 +253,7 @@ struct ProminenceTests {
 
         let rows = ListenerAttributor().present([row(port: 61330, name: "node", cwd: directory.path)])
         #expect(rows.first?.label == "late-bound")
-        #expect(rows.first?.prominence == .yours, "a project must never be folded away")
+        #expect(rows.first?.prominence == .devServer, "a project must never be folded away")
     }
 
     @Test("your own server on a chosen port is yours")
@@ -255,16 +261,37 @@ struct ProminenceTests {
         let rows = ListenerAttributor().present([
             row(port: 8000, name: "Python", cwd: "/", arguments: ["python3", "-m", "http.server"]),
         ])
-        #expect(rows.first?.prominence == .yours)
+        #expect(rows.first?.prominence == .devServer)
     }
 
-    @Test("an app of yours that merely happens to listen is not")
-    func ordinaryAppIsSystem() {
-        // The complaint this rule exists for: Raycast runs as you, on a low
-        // port, and is never what you opened the panel to find.
+    @Test("an app of yours that merely happens to listen is an application")
+    func ordinaryAppIsApplication() {
+        // Raycast runs as you, on a low port, and is never what you opened the
+        // panel to find — but it is yours to quit, unlike a daemon.
         let rows = ListenerAttributor().present([
             row(port: 7265, name: "Raycast", cwd: "/",
+                executable: "/Applications/Raycast.app/Contents/MacOS/Raycast",
                 arguments: ["/Applications/Raycast.app/Contents/MacOS/Raycast"]),
+        ])
+        #expect(rows.first?.prominence == .application)
+    }
+
+    @Test("a helper inside your own Library is still an application")
+    func userLibraryHelperIsApplication() {
+        // ~/Library is deliberately not treated as a system location.
+        let rows = ListenerAttributor().present([
+            row(port: 44950, name: "figma_agent", cwd: "/",
+                executable: "/Users/someone/Library/Application Support/Figma/FigmaAgent.app/Contents/MacOS/figma_agent"),
+        ])
+        #expect(rows.first?.prominence == .application)
+    }
+
+    @Test("a daemon of yours living in /usr is system, not an application")
+    func userOwnedSystemDaemonIsSystem() {
+        // rapportd runs as you but is part of the operating system, and where
+        // its executable lives is what says so.
+        let rows = ListenerAttributor().present([
+            row(port: 55778, name: "rapportd", cwd: "/", executable: "/usr/libexec/rapportd"),
         ])
         #expect(rows.first?.prominence == .system)
     }
@@ -286,9 +313,9 @@ struct ProminenceTests {
         #expect(rows.first?.prominence == .system)
     }
 
-    @Test("a daemon on a random high port is system")
-    func highPortDaemonIsSystem() {
-        let rows = ListenerAttributor().present([row(port: 55778, name: "rapportd", cwd: "/")])
+    @Test("a process we cannot identify is kept out of the way")
+    func unidentifiableProcessIsSystem() {
+        let rows = ListenerAttributor().present([row(port: 55778, name: "mystery", cwd: "/")])
         #expect(rows.first?.prominence == .system)
     }
 }
