@@ -1,12 +1,14 @@
 import LocalhostKit
 import SwiftUI
 
-struct ListenerRowView: View {
+public struct ListenerRowView: View {
     let row: ListenerPresentation
+
+    public init(row: ListenerPresentation) { self.row = row }
 
     private var process: ProcessIdentity { row.listener.process }
 
-    var body: some View {
+    public var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(String(row.listener.port))
                 .font(.system(.body, design: .monospaced))
@@ -20,6 +22,13 @@ struct ListenerRowView: View {
                         .fontWeight(row.label == nil ? .regular : .medium)
                         .lineLimit(1)
                         .truncationMode(.middle)
+
+                    if let branch = row.branch {
+                        Text(branch)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
 
                     if row.isExposedDevServer {
                         Image(systemName: "dot.radiowaves.left.and.right")
@@ -51,7 +60,14 @@ struct ListenerRowView: View {
     /// The second line never repeats the first.
     private var secondary: String? {
         if let advice = row.advice { return advice }
+        // "Next.js 16.2.12" says more than "node", and we paid nothing for it.
+        if let runtime = row.runtime, row.label != nil {
+            return "\(runtime) · \(process.pid)"
+        }
         if row.label != nil { return "\(process.name) · \(process.pid)" }
+        if let runtime = row.runtime, process.isOurs {
+            return "\(runtime) · \(process.pid)"
+        }
         // The primary line is already the process name here, so say who owns it
         // rather than repeating it. "another user · 1" was true and unhelpful.
         if !process.isOurs { return process.uid == 0 ? "root" : "uid \(process.uid)" }
@@ -61,6 +77,7 @@ struct ListenerRowView: View {
     /// Everything the row could not fit, so nothing is only truncated.
     private var tooltip: String {
         var lines = ["\(process.name) · pid \(process.pid)"]
+        if let runtime = row.runtime { lines.append(String(describing: runtime)) }
         lines.append(row.listener.addresses.joined(separator: ", ") + ":\(row.listener.port)")
         if let advice = row.advice { lines.append(advice) }
         if case let .project(_, root, source) = row.attribution {

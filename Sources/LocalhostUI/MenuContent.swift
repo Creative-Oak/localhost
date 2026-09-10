@@ -1,11 +1,13 @@
 import LocalhostKit
 import SwiftUI
 
-struct MenuContent: View {
+public struct MenuContent: View {
     @State private var store: ListenerStore
     /// Height of the row list, measured rather than assumed.
     @State private var contentHeight: CGFloat = 0
     @State private var showsBackground = false
+    @State private var query = ""
+    @FocusState private var searchFocused: Bool
     /// Drives refreshes only when the panel is really on screen; the renderer
     /// seeds its own data and must not start a scan loop.
     private let scans: Bool
@@ -13,7 +15,7 @@ struct MenuContent: View {
     /// the headless renderer wants.
     private let maximumListHeight: CGFloat
 
-    init(
+    public init(
         store: ListenerStore = ListenerStore(),
         scans: Bool = true,
         maximumListHeight: CGFloat = 520
@@ -23,11 +25,14 @@ struct MenuContent: View {
         self.maximumListHeight = maximumListHeight
     }
 
-    var body: some View {
+    public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
+            search
 
-            if listed.isEmpty, background.isEmpty {
+            if let freePort {
+                answer("\(freePort) is free", symbol: "checkmark.circle.fill", tint: .green)
+            } else if listed.isEmpty, background.isEmpty {
                 emptyState
             } else {
                 list
@@ -65,11 +70,42 @@ struct MenuContent: View {
     }
 
     private var listed: [ListenerPresentation] {
-        store.rows.filter { $0.prominence == .listed }
+        ListenerSearch.filter(store.rows.filter { $0.prominence == .listed }, query: query)
     }
 
     private var background: [ListenerPresentation] {
-        store.rows.filter { $0.prominence == .background }
+        ListenerSearch.filter(store.rows.filter { $0.prominence == .background }, query: query)
+    }
+
+    /// A port the query names that nothing holds. This is an answer, not an
+    /// empty result, so it gets said out loud.
+    private var freePort: UInt16? {
+        ListenerSearch.freePort(in: query, rows: store.rows)
+    }
+
+    private var search: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            TextField("Port, project or process", text: $query)
+                .textFieldStyle(.plain)
+                .focused($searchFocused)
+            if !query.isEmpty {
+                Button {
+                    query = ""
+                    searchFocused = true
+                } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
+        // Keyboard-first: the panel opens ready to be typed into.
+        .onAppear { searchFocused = true }
     }
 
     private var measuredRows: some View {
@@ -135,13 +171,29 @@ struct MenuContent: View {
         .padding(.bottom, 6)
     }
 
+    private func answer(_ text: String, symbol: String, tint: Color) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: symbol).foregroundStyle(tint)
+            Text(text).fontWeight(.medium)
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+    }
+
     @ViewBuilder
     private var emptyState: some View {
-        Text(store.hasScanned ? "Nothing is listening." : "Scanning…")
+        Text(emptyMessage)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)
             .padding(.vertical, 14)
+    }
+
+    private var emptyMessage: String {
+        if !store.hasScanned { return "Scanning…" }
+        if !query.isEmpty { return "Nothing matches \"\(query)\"." }
+        return "Nothing is listening."
     }
 
     private var footer: some View {

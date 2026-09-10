@@ -1,4 +1,5 @@
 import LocalhostKit
+import LocalhostUI
 import SwiftUI
 
 @main

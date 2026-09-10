@@ -47,13 +47,19 @@ inspectable by opening it, which makes layout regressions easy to miss —
 `ScrollView` reporting no intrinsic height once shrank the whole list to a
 single row, and the header count was the only clue.
 
+`Tests/LocalhostUITests` renders the panel the same way and asserts on it, so
+that class of bug fails the build rather than the eye. `TextField` and `Button`
+do not draw under `ImageRenderer`; they appear as coloured blocks in a render
+and are fine in the running app.
+
 ## Layout
 
 ```
 Sources/LocalhostKit/     discovery and attribution; cannot signal a process
-  Ports/                  scanners, and the oracle that validates them
-  Processes/              process facts, project resolution, daemon table
-Sources/Localhost/        the menu bar app
+  Ports/                  scanners, the oracle that validates them, search
+  Processes/              process facts, project + runtime + branch, daemons
+Sources/LocalhostUI/      views and view state, separate so layout is testable
+Sources/Localhost/        the executable and its diagnostics
 spike/                    step 1; kept for the struct offsets it recovered
 ```
 

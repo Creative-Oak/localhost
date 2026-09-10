@@ -9,16 +9,16 @@ import Observation
 /// as it is on screen, so a closed menu costs nothing.
 @MainActor
 @Observable
-final class ListenerStore {
-    private(set) var rows: [ListenerPresentation] = []
-    private(set) var oracle: OracleStatus = .verified(matched: 0)
-    private(set) var lastScanDuration: Duration?
-    private(set) var hasScanned = false
+public final class ListenerStore {
+    public private(set) var rows: [ListenerPresentation] = []
+    public private(set) var oracle: OracleStatus = .verified(matched: 0)
+    public private(set) var lastScanDuration: Duration?
+    public private(set) var hasScanned = false
 
     private let scanner: ListenerScanner
     private let attributor: ListenerAttributor
 
-    init(scanner: ListenerScanner = ListenerScanner(),
+    public init(scanner: ListenerScanner = ListenerScanner(),
          attributor: ListenerAttributor = ListenerAttributor()) {
         self.scanner = scanner
         self.attributor = attributor
@@ -26,7 +26,7 @@ final class ListenerStore {
 
     /// Seeded with a scan that already happened, for previews and for
     /// rendering the panel without a window server.
-    init(rows: [ListenerPresentation], oracle: OracleStatus) {
+    public init(rows: [ListenerPresentation], oracle: OracleStatus) {
         self.scanner = ListenerScanner()
         self.attributor = ListenerAttributor()
         self.rows = rows
@@ -34,7 +34,7 @@ final class ListenerStore {
         self.hasScanned = true
     }
 
-    func refresh() async {
+    public func refresh() async {
         let scanner = self.scanner
         let attributor = self.attributor
 
@@ -52,7 +52,7 @@ final class ListenerStore {
     }
 
     /// Refresh until the caller is cancelled — which happens when the menu closes.
-    func refreshUntilCancelled(every interval: Duration = .seconds(2)) async {
+    public func refreshUntilCancelled(every interval: Duration = .seconds(2)) async {
         while !Task.isCancelled {
             await refresh()
             do { try await Task.sleep(for: interval) } catch { return }

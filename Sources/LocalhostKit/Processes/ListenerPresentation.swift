@@ -33,6 +33,22 @@ public struct ListenerPresentation: Identifiable, Hashable, Sendable {
 
     public let listener: Listener
     public let attribution: Attribution
+    /// What the process is running, from argv. Nil when we cannot tell.
+    public let runtime: Runtime?
+    /// The branch checked out at the project root, when there is one.
+    public let branch: String?
+
+    public init(
+        listener: Listener,
+        attribution: Attribution,
+        runtime: Runtime? = nil,
+        branch: String? = nil
+    ) {
+        self.listener = listener
+        self.attribution = attribution
+        self.runtime = runtime
+        self.branch = branch
+    }
 
     public var id: Listener.ID { listener.id }
 
@@ -67,6 +83,17 @@ public struct ListenerPresentation: Identifiable, Hashable, Sendable {
         if case let .knownDaemon(daemon) = attribution { return daemon.advice }
         return nil
     }
+
+    /// Ascending port order is predictable and puts the least interesting row
+    /// first — on a normal machine that is a Kerberos daemon. Rows are ranked
+    /// by how likely they are to be what someone opened the menu to find.
+    var rank: Int {
+        switch attribution {
+        case .project: return 0
+        case .knownDaemon: return 1
+        case .nothing, .unavailable: return prominence == .listed ? 2 : 3
+        }
+    }
 }
 
 /// Turns scanned listeners into rows. Pure, and separate from both the scan and
@@ -79,9 +106,24 @@ public struct ListenerAttributor: Sendable {
     }
 
     public func present(_ listeners: [Listener]) -> [ListenerPresentation] {
-        listeners.map { listener in
-            ListenerPresentation(listener: listener, attribution: attribution(for: listener))
-        }
+        listeners
+            .map { listener in
+                let attribution = attribution(for: listener)
+                var branch: String?
+                if case let .project(_, root, _) = attribution {
+                    branch = GitBranch.branch(at: root)
+                }
+                return ListenerPresentation(
+                    listener: listener,
+                    attribution: attribution,
+                    runtime: RuntimeIdentifier.runtime(
+                        arguments: listener.process.arguments,
+                        executablePath: listener.process.executablePath),
+                    branch: branch)
+            }
+            .sorted { left, right in
+                (left.rank, left.listener.port) < (right.rank, right.listener.port)
+            }
     }
 
     private func attribution(for listener: Listener) -> ListenerPresentation.Attribution {
