@@ -11,6 +11,9 @@ public struct ListenerPresentation: Identifiable, Hashable, Sendable {
         case project(name: String, root: URL, source: ProjectResolver.Source)
         /// A system service the table can explain, including launchd-held sockets.
         case knownDaemon(KnownDaemon)
+        /// A container publishing this port. The owning process is a Docker
+        /// helper, so without this the row would say "com.docker.backend".
+        case container(Container)
         /// We could not read a working directory — almost always because the
         /// process belongs to another user.
         case unavailable
@@ -62,6 +65,9 @@ public struct ListenerPresentation: Identifiable, Hashable, Sendable {
         // A resolved project is the whole point of the app, whatever the port.
         case .project:
             return .listed
+        // A published container port is something someone chose to publish.
+        case .container:
+            return .listed
         // "Why can't I bind 5000?" is the question the daemon table answers.
         case .knownDaemon:
             return .listed
@@ -75,6 +81,7 @@ public struct ListenerPresentation: Identifiable, Hashable, Sendable {
         switch attribution {
         case let .project(name, _, _): return name
         case let .knownDaemon(daemon): return daemon.label
+        case let .container(container): return container.label
         case .unavailable, .nothing: return nil
         }
     }
@@ -90,8 +97,9 @@ public struct ListenerPresentation: Identifiable, Hashable, Sendable {
     var rank: Int {
         switch attribution {
         case .project: return 0
-        case .knownDaemon: return 1
-        case .nothing, .unavailable: return prominence == .listed ? 2 : 3
+        case .container: return 1
+        case .knownDaemon: return 2
+        case .nothing, .unavailable: return prominence == .listed ? 3 : 4
         }
     }
 }
@@ -100,15 +108,22 @@ public struct ListenerPresentation: Identifiable, Hashable, Sendable {
 /// the interface so it can be tested without either.
 public struct ListenerAttributor: Sendable {
     private let resolver: ProjectResolver
+    private let containers: ContainerLabels
 
-    public init(resolver: ProjectResolver = ProjectResolver()) {
+    public init(
+        resolver: ProjectResolver = ProjectResolver(),
+        containers: ContainerLabels = ContainerLabels()
+    ) {
         self.resolver = resolver
+        self.containers = containers
     }
 
     public func present(_ listeners: [Listener]) -> [ListenerPresentation] {
-        listeners
+        // One request per scan, hard-bounded, and an empty map on any failure.
+        let published = containers.byPublishedPort()
+        return listeners
             .map { listener in
-                let attribution = attribution(for: listener)
+                let attribution = attribution(for: listener, published: published)
                 var branch: String?
                 if case let .project(_, root, _) = attribution {
                     branch = GitBranch.branch(at: root)
@@ -126,13 +141,21 @@ public struct ListenerAttributor: Sendable {
             }
     }
 
-    private func attribution(for listener: Listener) -> ListenerPresentation.Attribution {
+    private func attribution(
+        for listener: Listener,
+        published: [UInt16: Container]
+    ) -> ListenerPresentation.Attribution {
         // The daemon table comes first on purpose. For a launchd-held socket the
         // owning process really is launchd and its working directory really is
         // "/", so project resolution would correctly find nothing and the row
         // would read "launchd" with no explanation.
         if let daemon = KnownDaemons.daemon(port: listener.port, processName: listener.process.name) {
             return .knownDaemon(daemon)
+        }
+        // Checked before the project, because the process holding a published
+        // port is a Docker helper whose working directory tells us nothing.
+        if let container = published[listener.port] {
+            return .container(container)
         }
         guard let directory = listener.process.workingDirectory else {
             return listener.process.isOurs ? .nothing : .unavailable

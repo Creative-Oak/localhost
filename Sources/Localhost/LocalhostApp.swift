@@ -68,9 +68,16 @@ enum Diagnostics {
 
     static func printInventory() {
         let result = ListenerScanner().scan()
-        let rows = ListenerAttributor().present(result.listeners)
 
-        print("scan: \(result.duration), \(rows.count) listeners, oracle: \(result.oracle)")
+        // Attribution is where the Docker request happens, so it is timed
+        // separately: labelling must never be the reason a scan is slow.
+        let containers = ContainerLabels()
+        let startedAttribution = ContinuousClock.now
+        let rows = ListenerAttributor(containers: containers).present(result.listeners)
+        let attribution = ContinuousClock.now - startedAttribution
+
+        print("scan: \(result.duration), attribution: \(attribution), \(rows.count) listeners, oracle: \(result.oracle)")
+        print("docker: socket \(containers.isAvailable ? "found" : "absent"), \(containers.containers().count) containers")
         for row in rows {
             let port = String(row.listener.port).leftPadded(to: 6)
             let name = row.listener.process.name

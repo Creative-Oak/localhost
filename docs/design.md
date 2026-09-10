@@ -163,9 +163,14 @@ Two rules keep this from becoming container management:
    running means rows appear without container names. This feature can never be
    the reason the app fails.
 
-Rule 2 is confirmed working — the spike hit `ECONNREFUSED` against a present
-but dead OrbStack socket. Rule 1 and the response shape are still untested; the
-daemon was not running.
+Both rules hold, and both are tested. Rule 1 is structural: the only request
+`ContainerLabels` can make is a GET of the container list, so there is no code
+path that could grow a start or a stop. Rule 2 is tested against real sockets —
+absent, present-but-refusing, and accepting-then-hanging — each of which must
+produce an empty map in well under a second.
+
+Measured against a live OrbStack daemon: the request costs 3-20ms, inside a
+scan that must finish well within a two-second refresh.
 
 ## Interface
 
@@ -208,12 +213,12 @@ Killing root-owned processes is a later conversation, if ever.
 ## Order of work
 
 1. ~~**Spike.**~~ Done — [spike-findings.md](spike-findings.md).
-2. **Walking skeleton.** Port and process name in the menu bar. No actions.
-   Use it daily for a week.
-3. **Actions.** Open, copy, reveal, kill — with a confirmation that names the
-   process, and the identity re-check.
-4. **Attribution.** cwd → project label, argv fallback, known daemons, Docker
-   container names.
+2. ~~**Walking skeleton.**~~ Done. The week of daily use before actions was
+   skipped by decision.
+3. ~~**Actions.**~~ Done: open, copy, reveal, quit — with a confirmation that
+   names the process, and the identity re-check.
+4. ~~**Attribution.**~~ Done: cwd → project label, argv → runtime and version,
+   `.git/HEAD` → branch, known daemons, Docker container names.
 5. **Search**, and *free this port*.
 6. **Polish.** Empty states, permission-denied states, VoiceOver labels, icon.
 7. **Ship.** Sign, notarise, trial, product page.
@@ -230,5 +235,7 @@ something. Using it daily before adding actions is deliberate, not caution.
   by the startup oracle and the `pcblist64` fallback; the failure mode is root
   rows losing their names, not wrong data.
 - **Docker runtime divergence** across Docker Desktop, OrbStack and Colima.
-  Still untested — the daemon was down during the spike. Bounded, and it
-  degrades safely.
+  All three speak the same API and are covered by decoding fixtures; only
+  OrbStack has been exercised against a live daemon, and only with no
+  containers running. The port-to-container mapping is therefore proven by
+  fixture, not by observation.

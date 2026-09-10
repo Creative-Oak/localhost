@@ -87,6 +87,9 @@ public struct ListenerRowView: View {
     /// The second line never repeats the first.
     private var secondary: String? {
         if let advice = row.advice { return advice }
+        if case let .container(container) = row.attribution {
+            return container.image.isEmpty ? "container" : container.image
+        }
         // "Next.js 16.2.12" says more than "node", and we paid nothing for it.
         if let runtime = row.runtime, row.label != nil {
             return "\(runtime) · \(process.pid)"
