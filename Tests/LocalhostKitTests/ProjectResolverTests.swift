@@ -221,29 +221,24 @@ struct AttributionTests {
 
 @Suite("Prominence")
 struct ProminenceTests {
-    private func row(port: UInt16, name: String, cwd: String?) -> Listener {
+    private func row(
+        port: UInt16, name: String, cwd: String?, arguments: [String]? = nil, ours: Bool = true
+    ) -> Listener {
         Listener(
             port: port,
             addresses: ["127.0.0.1"],
             families: [.ipv4],
             process: ProcessIdentity(
-                pid: 10, startedAt: 1, uid: getuid(), name: name, workingDirectory: cwd))
+                pid: 10,
+                startedAt: ours ? 1 : nil,
+                uid: ours ? getuid() : 0,
+                name: name,
+                arguments: arguments,
+                workingDirectory: cwd))
     }
 
-    @Test("a daemon on a random high port folds away")
-    func highPortDaemonIsBackground() {
-        let rows = ListenerAttributor().present([row(port: 55778, name: "rapportd", cwd: "/")])
-        #expect(rows.first?.prominence == .background)
-    }
-
-    @Test("a port a person would choose stays listed", arguments: [80, 443, 3000, 5432, 8080] as [UInt16])
-    func chosenPortsAreListed(port: UInt16) {
-        let rows = ListenerAttributor().present([row(port: port, name: "node", cwd: "/")])
-        #expect(rows.first?.prominence == .listed)
-    }
-
-    @Test("a resolved project is listed whatever the port")
-    func projectAlwaysWinsOverPortNumber() throws {
+    @Test("a resolved project is yours, whatever the port")
+    func projectAlwaysWins() throws {
         let directory = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("prominence-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -252,14 +247,48 @@ struct ProminenceTests {
 
         let rows = ListenerAttributor().present([row(port: 61330, name: "node", cwd: directory.path)])
         #expect(rows.first?.label == "late-bound")
-        #expect(rows.first?.prominence == .listed, "a project must never be folded away")
+        #expect(rows.first?.prominence == .yours, "a project must never be folded away")
     }
 
-    @Test("a known daemon on a high port is still listed")
-    func knownDaemonIsListed() {
-        // Not currently reachable via the table, but the rule must not depend
-        // on the port for something we can actually explain.
-        let rows = ListenerAttributor().present([row(port: 5900, name: "launchd", cwd: "/")])
-        #expect(rows.first?.prominence == .listed)
+    @Test("your own server on a chosen port is yours")
+    func recognisedRuntimeIsYours() {
+        let rows = ListenerAttributor().present([
+            row(port: 8000, name: "Python", cwd: "/", arguments: ["python3", "-m", "http.server"]),
+        ])
+        #expect(rows.first?.prominence == .yours)
+    }
+
+    @Test("an app of yours that merely happens to listen is not")
+    func ordinaryAppIsSystem() {
+        // The complaint this rule exists for: Raycast runs as you, on a low
+        // port, and is never what you opened the panel to find.
+        let rows = ListenerAttributor().present([
+            row(port: 7265, name: "Raycast", cwd: "/",
+                arguments: ["/Applications/Raycast.app/Contents/MacOS/Raycast"]),
+        ])
+        #expect(rows.first?.prominence == .system)
+    }
+
+    @Test("a daemon we can explain is still system")
+    func knownDaemonIsSystem() {
+        // The table makes AirPlay findable when someone hunts for 5000. It does
+        // not make it worth a permanent row.
+        let rows = ListenerAttributor().present([row(port: 5000, name: "ControlCenter", cwd: "/")])
+        #expect(rows.first?.label == "AirPlay Receiver")
+        #expect(rows.first?.prominence == .system)
+    }
+
+    @Test("another user's process is never yours")
+    func foreignProcessIsSystem() {
+        let rows = ListenerAttributor().present([
+            row(port: 8021, name: "launchd", cwd: nil, ours: false),
+        ])
+        #expect(rows.first?.prominence == .system)
+    }
+
+    @Test("a daemon on a random high port is system")
+    func highPortDaemonIsSystem() {
+        let rows = ListenerAttributor().present([row(port: 55778, name: "rapportd", cwd: "/")])
+        #expect(rows.first?.prominence == .system)
     }
 }

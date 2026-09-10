@@ -5,7 +5,7 @@ public struct MenuContent: View {
     @State private var store: ListenerStore
     /// Height of the row list, measured rather than assumed.
     @State private var contentHeight: CGFloat = 0
-    @State private var showsBackground = false
+    @State private var showsSystem = false
     @State private var query = ""
     @State private var selection: Listener.ID?
     @State private var pending: PendingTermination?
@@ -22,13 +22,17 @@ public struct MenuContent: View {
         store: ListenerStore = ListenerStore(),
         scans: Bool = true,
         maximumListHeight: CGFloat = 520,
-        initialSelection: Listener.ID? = nil
+        initialSelection: Listener.ID? = nil,
+        highlightFooter: Bool = false
     ) {
         _store = State(initialValue: store)
         self.scans = scans
         self.maximumListHeight = maximumListHeight
         _selection = State(initialValue: initialSelection)
+        self.highlightFooter = highlightFooter
     }
+
+    private let highlightFooter: Bool
 
     /// One confirmation path, so quitting one process and quitting a project
     /// cannot drift apart.
@@ -93,15 +97,15 @@ public struct MenuContent: View {
             case let .taken(row):
                 takenAnswer(row)
             case .notAPort:
-                if sections.isEmpty, background.isEmpty {
+                if sections.isEmpty, system.isEmpty {
                     emptyState
                 } else {
                     list
                 }
             }
 
-            if !background.isEmpty {
-                backgroundDisclosure
+            if !system.isEmpty {
+                systemDisclosure
             }
 
             if let message = store.actionError {
@@ -112,6 +116,14 @@ public struct MenuContent: View {
             footer
         }
         .frame(width: 340)
+        // Rows highlight edge to edge, so near the panel's rounded corner a
+        // highlight would otherwise draw past the window's shape and onto the
+        // desktop. Clipping the content — and only the content — keeps
+        // highlights inside a rounded shape while the material below stays
+        // square and is shaped by the window itself. The radius is deliberately
+        // smaller than the system's, because clipping content more tightly than
+        // the window is invisible, whereas clipping it wider leaves a gap.
+        .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
         .background(VisualEffectBackground())
         // Keyboard-first: move with the arrows, act with Return, without ever
         // leaving the search field.
@@ -144,21 +156,25 @@ public struct MenuContent: View {
 
     // MARK: - Rows
 
-    private var listed: [ListenerPresentation] {
-        ListenerSearch.filter(store.rows.filter { $0.prominence == .listed }, query: query)
+    private var yours: [ListenerPresentation] {
+        ListenerSearch.filter(store.rows.filter { $0.prominence == .yours }, query: query)
     }
 
-    private var background: [ListenerPresentation] {
-        ListenerSearch.filter(store.rows.filter { $0.prominence == .background }, query: query)
+    private var system: [ListenerPresentation] {
+        ListenerSearch.filter(store.rows.filter { $0.prominence == .system }, query: query)
     }
+
+    /// A search reaches everything. Hiding a match behind a disclosure would
+    /// mean saying "nothing matches 5000" while AirPlay sits on it.
+    private var revealsSystem: Bool { showsSystem || !query.isEmpty }
 
     private var sections: [ListenerSection] {
-        ListenerGrouping.sections(from: listed)
+        ListenerGrouping.sections(from: yours)
     }
 
     /// Everything on screen, in the order the arrow keys should walk it.
     private var visible: [ListenerPresentation] {
-        showsBackground ? listed + background : listed
+        revealsSystem ? yours + system : yours
     }
 
     /// A scroll view appears only once the rows genuinely overflow.
@@ -194,8 +210,8 @@ public struct MenuContent: View {
                     .padding(.leading, section.project == nil ? 0 : 10)
                 }
             }
-            if showsBackground {
-                ForEach(background) { row in
+            if revealsSystem {
+                ForEach(system) { row in
                     ListenerRowView(row: row, isSelected: row.id == selection) { action in
                         perform(action, on: row)
                     }
@@ -261,7 +277,7 @@ public struct MenuContent: View {
                 .font(.headline)
             Spacer()
             if store.hasScanned {
-                Text("\(listed.count)")
+                Text("\(yours.count)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
@@ -353,16 +369,16 @@ public struct MenuContent: View {
 
     /// Folded away, never hidden: telling someone nothing is on 44950 when
     /// something is would be worse than the clutter.
-    private var backgroundDisclosure: some View {
+    private var systemDisclosure: some View {
         Button {
-            withAnimation(.snappy(duration: 0.15)) { showsBackground.toggle() }
+            withAnimation(.snappy(duration: 0.15)) { showsSystem.toggle() }
         } label: {
             HStack(spacing: 4) {
-                Image(systemName: showsBackground ? "chevron.down" : "chevron.right")
+                Image(systemName: revealsSystem ? "chevron.down" : "chevron.right")
                     .font(.caption2)
-                Text(showsBackground
-                     ? "Hide background services"
-                     : "\(background.count) background services")
+                Text(revealsSystem
+                     ? "Hide system listeners"
+                     : "\(system.count) system listeners")
                 Spacer()
             }
             .font(.caption)
@@ -372,10 +388,10 @@ public struct MenuContent: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("Services on ports nobody chose — high, operating-system-assigned ports")
-        .accessibilityLabel(showsBackground
-            ? "Hide background services"
-            : "Show \(background.count) background services")
+        .help("Daemons, launchd-held sockets and other users' processes — everything you did not start")
+        .accessibilityLabel(revealsSystem
+            ? "Hide system listeners"
+            : "Show \(system.count) system listeners")
         .accessibilityAddTraits(.isButton)
     }
 
@@ -392,7 +408,7 @@ public struct MenuContent: View {
         if !store.hasScanned { return "Scanning…" }
         if !query.isEmpty { return "Nothing matches \"\(query)\"." }
         if case .failed = store.oracle { return "Could not read the port table." }
-        return "Nothing is listening."
+        return "No development servers running."
     }
 
     /// Says what is missing and why, because a shorter list is otherwise
@@ -454,7 +470,11 @@ public struct MenuContent: View {
     private var footer: some View {
         VStack(alignment: .leading, spacing: 0) {
             if !store.oracle.isTrustworthy { oracleFooter }
-            MenuActionRow(title: "Quit Localhost", symbol: "power") {
+            MenuActionRow(
+                title: "Quit Localhost",
+                symbol: "power",
+                forceHighlighted: highlightFooter
+            ) {
                 NSApplication.shared.terminate(nil)
             }
         }

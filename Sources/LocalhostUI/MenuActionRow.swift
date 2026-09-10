@@ -10,9 +10,15 @@ import SwiftUI
 struct MenuActionRow: View {
     let title: String
     var symbol: String?
+    /// Forces the hover appearance. The row sits against the panel's rounded
+    /// corner, where a highlight can escape the window's shape — and hover
+    /// cannot be triggered in a headless screenshot.
+    var forceHighlighted = false
     var action: () -> Void
 
     @State private var isHovered = false
+
+    private var highlighted: Bool { isHovered || forceHighlighted }
 
     var body: some View {
         Button(action: action) {
@@ -25,14 +31,14 @@ struct MenuActionRow: View {
                 Text(title)
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(isHovered
+            .foregroundStyle(highlighted
                 ? AnyShapeStyle(Color(nsColor: .alternateSelectedControlTextColor))
                 : AnyShapeStyle(.primary))
             .padding(.horizontal, 12)
             .padding(.vertical, 4)
             .background(
                 RoundedRectangle(cornerRadius: 5)
-                    .fill(isHovered ? Color(nsColor: .selectedContentBackgroundColor) : .clear)
+                    .fill(highlighted ? Color(nsColor: .selectedContentBackgroundColor) : .clear)
                     .padding(.horizontal, 5)
             )
             .contentShape(Rectangle())

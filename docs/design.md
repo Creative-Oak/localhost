@@ -308,6 +308,24 @@ be neither compiled nor tested, so it would be guesswork. The work above is
 current-HIG and uses semantic materials and colours throughout, which is what
 carries forward.
 
+## Yours, and everything else
+
+The first cut of this sorted by "would a developer type this port", which put
+AirPlay, Screen Sharing, Kerberos and Raycast permanently on screen. They are
+worth explaining when someone goes hunting for port 5000, and worth nothing the
+rest of the time.
+
+A row is **yours** if it resolved to a project or a container, or if it is one
+of your own processes running a runtime we recognise on a port a person would
+choose. Everything else is **system**, folded behind one disclosure. The
+distinction that does the work is the runtime: Raycast runs as you, on a low
+port, and is never what you opened the panel to find — but it is not a server,
+and argv says so.
+
+Search reaches both tiers regardless of the disclosure. Answering "nothing
+matches 5000" while AirPlay sits on it would be a lie of exactly the kind the
+folding is meant to avoid.
+
 ## Performance
 
 Measured on a release build, 578 processes, 17 listeners. Instinct was wrong

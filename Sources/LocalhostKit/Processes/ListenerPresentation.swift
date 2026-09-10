@@ -27,11 +27,13 @@ public struct ListenerPresentation: Identifiable, Hashable, Sendable {
     /// project is it?". A daemon on a random high port is never the answer, and
     /// on a normal machine there are more of those than there are real ones.
     public enum Prominence: Hashable, Sendable {
-        /// Something a developer might plausibly be looking for.
-        case listed
-        /// A background service on a port nobody chose. Still shown, but folded
-        /// away — never hidden, because "nothing is on 44950" would be a lie.
-        case background
+        /// Something you started: a resolved project, a container, or one of
+        /// your own processes running a server we recognise.
+        case yours
+        /// Everything else — daemons, launchd-held sockets, other users'
+        /// processes, and services on ports nobody chose. Folded away, never
+        /// hidden, because "nothing is on 5000" would be a lie.
+        case system
     }
 
     public let listener: Listener
@@ -62,17 +64,31 @@ public struct ListenerPresentation: Identifiable, Hashable, Sendable {
 
     public var prominence: Prominence {
         switch attribution {
-        // A resolved project is the whole point of the app, whatever the port.
-        case .project:
-            return .listed
-        // A published container port is something someone chose to publish.
-        case .container:
-            return .listed
-        // "Why can't I bind 5000?" is the question the daemon table answers.
+        // A resolved project or a published container is the whole point of
+        // the app, whatever the port.
+        case .project, .container:
+            return .yours
+
+        // AirPlay, Screen Sharing and Kerberos are worth explaining when
+        // someone goes looking for the port, and worth nothing the rest of the
+        // time. The daemon table makes them findable; it does not make them
+        // interesting.
         case .knownDaemon:
-            return .listed
-        case .unavailable, .nothing:
-            return listener.port <= Self.highestChosenPort ? .listed : .background
+            return .system
+
+        // Another user's process is never something you started.
+        case .unavailable:
+            return .system
+
+        case .nothing:
+            // No project, so the question is whether this looks like a server
+            // you ran. A recognised runtime on a port a person would choose is
+            // the evidence; a menu bar app that happens to listen is not.
+            guard listener.process.isOurs,
+                  runtime != nil,
+                  listener.port <= Self.highestChosenPort
+            else { return .system }
+            return .yours
         }
     }
 
@@ -98,8 +114,8 @@ public struct ListenerPresentation: Identifiable, Hashable, Sendable {
         switch attribution {
         case .project: return 0
         case .container: return 1
-        case .knownDaemon: return 2
-        case .nothing, .unavailable: return prominence == .listed ? 3 : 4
+        case .nothing, .unavailable: return prominence == .yours ? 2 : 4
+        case .knownDaemon: return 3
         }
     }
 }

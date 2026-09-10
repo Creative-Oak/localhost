@@ -128,9 +128,23 @@ public struct ListenerScanner: PortScanning {
         }
     }
 
-    /// libproc derives a PID from the socket's owning file descriptor, so where
-    /// both scanners see the same endpoint they must agree. A single
-    /// disagreement means an offset moved and every root-owned row is suspect.
+    /// Decides whether the private-struct parse can be trusted.
+    ///
+    /// The distinction that matters: a **structurally broken** parse versus a
+    /// field that is approximate by design.
+    ///
+    /// `so_last_pid` is the last process to have touched the socket, not its
+    /// owner. For a socket that has been inherited, or handed around, or simply
+    /// touched by a sibling process, it legitimately differs from the process
+    /// holding the descriptor — and libproc, which derives the pid from the
+    /// descriptor itself, is the one that is right. Demanding unanimity here
+    /// treated that documented approximation as corruption, and intermittently
+    /// threw away every root-owned listener.
+    ///
+    /// If the offsets really moved, `inp_lport` reads garbage and the endpoints
+    /// stop matching libproc's at all — so endpoint overlap is the structural
+    /// check. Pid agreement across that overlap is the secondary one, catching
+    /// the case where `so_last_pid` alone has shifted.
     static func verify(_ candidate: [RawListener], against truth: [RawListener]) -> OracleStatus {
         guard !truth.isEmpty else {
             // Nothing of our own is listening, so there is nothing to check
@@ -144,21 +158,33 @@ public struct ListenerScanner: PortScanning {
             truth.map { (Endpoint($0), $0.pid) },
             uniquingKeysWith: { first, _ in first })
 
-        var matched = 0
+        var overlapping = 0
+        var agreeing = 0
         for row in candidate {
             guard let expectedPID = expected[Endpoint(row)] else { continue }
-            guard row.pid == expectedPID else {
-                return .degraded(reason:
-                    "pcblist_n reported pid \(row.pid) for port \(row.port), libproc reports \(expectedPID)")
-            }
-            matched += 1
+            overlapping += 1
+            if row.pid == expectedPID { agreeing += 1 }
         }
 
-        guard matched > 0 else {
-            return .degraded(reason: "pcblist_n saw none of the \(truth.count) listeners libproc found")
+        // Ports themselves did not survive: the layout is wrong.
+        guard overlapping > 0 else {
+            return .degraded(reason: "none of the \(truth.count) listeners libproc found appear in pcblist_n")
         }
-        return .verified(matched: matched)
+
+        // A handful of divergences is `so_last_pid` being what it is. Most of
+        // them being wrong means the field is no longer where we think it is.
+        let agreement = Double(agreeing) / Double(overlapping)
+        guard agreement >= Self.minimumPIDAgreement else {
+            return .degraded(reason:
+                "pcblist_n agreed with libproc on only \(agreeing) of \(overlapping) listeners")
+        }
+        return .verified(matched: overlapping)
     }
+
+    /// Chosen to sit far from both cases: legitimate `so_last_pid` divergence
+    /// affects a small minority of sockets, while a moved offset makes
+    /// essentially every pid wrong.
+    static let minimumPIDAgreement = 0.5
 
     // MARK: - Assembly
 

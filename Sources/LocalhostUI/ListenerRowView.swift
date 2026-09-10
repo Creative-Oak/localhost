@@ -9,6 +9,12 @@ public struct ListenerRowView: View {
     var inGroup: Bool = false
     var onAction: (ListenerAction) -> Void = { _ in }
 
+    @State private var isHovered = false
+
+    /// Menus highlight under the pointer, not only under the keyboard, so
+    /// hover and selection share one appearance.
+    private var isHighlighted: Bool { isSelected || isHovered }
+
     public init(
         row: ListenerPresentation,
         isSelected: Bool = false,
@@ -25,7 +31,7 @@ public struct ListenerRowView: View {
     /// menu does it. Leaving the second line `.secondary` puts grey on the
     /// selection blue, which fails contrast and looks unfinished.
     private var secondaryStyle: AnyShapeStyle {
-        isSelected
+        isHighlighted
             ? AnyShapeStyle(Color(nsColor: .alternateSelectedControlTextColor).opacity(0.8))
             : AnyShapeStyle(.secondary)
     }
@@ -48,7 +54,7 @@ public struct ListenerRowView: View {
                 .fontWeight(.medium)
                 .frame(width: 56, alignment: .trailing)
                 .foregroundStyle(process.isOurs
-                    ? (isSelected
+                    ? (isHighlighted
                         ? AnyShapeStyle(Color(nsColor: .alternateSelectedControlTextColor))
                         : AnyShapeStyle(.primary))
                     : secondaryStyle)
@@ -76,7 +82,7 @@ public struct ListenerRowView: View {
                             // The system orange, so it stays correct in dark
                             // mode and under Increase Contrast — but on the
                             // selection fill it becomes light like everything else.
-                            .foregroundStyle(isSelected
+                            .foregroundStyle(isHighlighted
                                 ? AnyShapeStyle(Color(nsColor: .alternateSelectedControlTextColor))
                                 : AnyShapeStyle(Color(nsColor: .systemOrange)))
                             .help("Bound to all interfaces — reachable from your network")
@@ -93,6 +99,15 @@ public struct ListenerRowView: View {
             }
 
             Spacer(minLength: 0)
+
+            // Nothing previously suggested a row was clickable. This appears
+            // under the pointer and names the outcome, rather than leaving
+            // people to try a click and find out.
+            if isHighlighted, row.supports(.openInBrowser) {
+                Image(systemName: "arrow.up.forward.app")
+                    .font(.caption)
+                    .foregroundStyle(Color(nsColor: .alternateSelectedControlTextColor).opacity(0.85))
+            }
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 12)
@@ -100,10 +115,19 @@ public struct ListenerRowView: View {
             // The highlight menus actually use, inset from the panel edge the
             // way NSMenu insets its own rows.
             RoundedRectangle(cornerRadius: 5)
-                .fill(isSelected ? Color(nsColor: .selectedContentBackgroundColor) : .clear)
+                .fill(isHighlighted ? Color(nsColor: .selectedContentBackgroundColor) : .clear)
                 .padding(.horizontal, 5)
         )
-        .foregroundStyle(isSelected ? AnyShapeStyle(Color(nsColor: .alternateSelectedControlTextColor)) : AnyShapeStyle(.primary))
+        .foregroundStyle(isHighlighted
+            ? AnyShapeStyle(Color(nsColor: .alternateSelectedControlTextColor))
+            : AnyShapeStyle(.primary))
+        .onHover { hovering in
+            isHovered = hovering
+            // A pointing hand is the system's own signal that something opens.
+            if row.supports(.openInBrowser) {
+                hovering ? NSCursor.pointingHand.push() : NSCursor.pop()
+            }
+        }
         .contentShape(Rectangle())
         .onTapGesture {
             if row.supports(.openInBrowser) { onAction(.openInBrowser) }

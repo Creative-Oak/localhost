@@ -35,12 +35,21 @@ enum PanelWindow {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
+        // The real menu panel has a generously rounded corner. A borderless
+        // square window hid an entire class of bug: a highlight running past
+        // the corner arc and drawing onto the desktop. Deliberately rounder
+        // than the system's, so anything that would escape shows up here first.
+        panel.contentView?.wantsLayer = true
+        panel.contentView?.layer?.cornerRadius = 18
+        panel.contentView?.layer?.cornerCurve = .continuous
+        panel.contentView?.layer?.masksToBounds = true
 
         // Preselect a row so the highlight is visible in the screenshot.
         let hosting = NSHostingView(rootView: MenuContent(
             store: store,
             scans: false,
-            initialSelection: store.rows.first(where: { $0.prominence == .listed })?.id))
+            initialSelection: store.rows.first(where: { $0.prominence == .yours })?.id,
+            highlightFooter: true))
         hosting.frame = panel.contentRect(forFrameRect: panel.frame)
         hosting.autoresizingMask = [.width, .height]
         panel.contentView = hosting
