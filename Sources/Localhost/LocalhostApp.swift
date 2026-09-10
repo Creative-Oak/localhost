@@ -11,6 +11,14 @@ enum Main {
             Diagnostics.printInventory()
             return
         }
+        // `Localhost --render <path>` draws the panel to a PNG with live data.
+        // A menu bar panel is otherwise only inspectable by opening it on
+        // someone's screen, which makes layout regressions easy to ship.
+        if let index = CommandLine.arguments.firstIndex(of: "--render"),
+           index + 1 < CommandLine.arguments.count {
+            Diagnostics.renderPanel(to: CommandLine.arguments[index + 1])
+            return
+        }
         LocalhostApp.main()
     }
 }
@@ -29,6 +37,34 @@ struct LocalhostApp: App {
 }
 
 enum Diagnostics {
+    @MainActor
+    static func renderPanel(to path: String) {
+        // The scan is synchronous, so the panel can be seeded and drawn without
+        // an event loop.
+        let result = ListenerScanner().scan()
+        let store = ListenerStore(
+            rows: ListenerAttributor().present(result.listeners),
+            oracle: result.oracle)
+
+        let renderer = ImageRenderer(content: MenuContent(store: store, scans: false, maximumListHeight: .infinity))
+        renderer.scale = 2
+
+        guard let image = renderer.nsImage,
+              let data = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: data),
+              let png = bitmap.representation(using: .png, properties: [:])
+        else {
+            print("render failed")
+            return
+        }
+        do {
+            try png.write(to: URL(fileURLWithPath: path))
+            print("wrote \(path) — \(store.rows.count) rows, \(Int(image.size.width))x\(Int(image.size.height))pt")
+        } catch {
+            print("render failed: \(error)")
+        }
+    }
+
     static func printInventory() {
         let result = ListenerScanner().scan()
         let rows = ListenerAttributor().present(result.listeners)

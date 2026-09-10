@@ -34,7 +34,7 @@ struct ListenerRowView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
-                        .truncationMode(.middle)
+                        .truncationMode(.tail)
                 }
             }
 
@@ -43,6 +43,7 @@ struct ListenerRowView: View {
         .padding(.vertical, 3)
         .padding(.horizontal, 12)
         .contentShape(Rectangle())
+        .help(tooltip)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
     }
@@ -53,6 +54,17 @@ struct ListenerRowView: View {
         if row.label != nil { return "\(process.name) · \(process.pid)" }
         if !process.isOurs { return "another user · \(process.pid)" }
         return "pid \(process.pid)"
+    }
+
+    /// Everything the row could not fit, so nothing is only truncated.
+    private var tooltip: String {
+        var lines = ["\(process.name) · pid \(process.pid)"]
+        lines.append(row.listener.addresses.joined(separator: ", ") + ":\(row.listener.port)")
+        if let advice = row.advice { lines.append(advice) }
+        if case let .project(_, root, source) = row.attribution {
+            lines.append("\(root.path) (\(source.rawValue))")
+        }
+        return lines.joined(separator: "\n")
     }
 
     private var accessibilityLabel: String {

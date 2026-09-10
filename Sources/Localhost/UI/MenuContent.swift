@@ -2,7 +2,25 @@ import LocalhostKit
 import SwiftUI
 
 struct MenuContent: View {
-    @State private var store = ListenerStore()
+    @State private var store: ListenerStore
+    /// Height of the row list, measured rather than assumed.
+    @State private var contentHeight: CGFloat = 0
+    /// Drives refreshes only when the panel is really on screen; the renderer
+    /// seeds its own data and must not start a scan loop.
+    private let scans: Bool
+    /// Past this the list scrolls. `.infinity` draws every row, which is what
+    /// the headless renderer wants.
+    private let maximumListHeight: CGFloat
+
+    init(
+        store: ListenerStore = ListenerStore(),
+        scans: Bool = true,
+        maximumListHeight: CGFloat = 520
+    ) {
+        _store = State(initialValue: store)
+        self.scans = scans
+        self.maximumListHeight = maximumListHeight
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -11,15 +29,7 @@ struct MenuContent: View {
             if store.rows.isEmpty {
                 emptyState
             } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(store.rows) { row in
-                            ListenerRowView(row: row)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-                .frame(maxHeight: 380)
+                list
             }
 
             Divider()
@@ -28,7 +38,42 @@ struct MenuContent: View {
         .frame(width: 340)
         // Scanning is tied to the lifetime of this view, so it runs while the
         // menu is open and stops the moment it closes. No background polling.
-        .task { await store.refreshUntilCancelled() }
+        .task { if scans { await store.refreshUntilCancelled() } }
+    }
+
+    /// A scroll view appears only once the rows genuinely overflow.
+    ///
+    /// `ScrollView` reports no intrinsic height, so wrapping the list in one
+    /// unconditionally collapses the panel to a single row inside
+    /// `MenuBarExtra`'s window sizing. The rows are therefore laid out and
+    /// measured first, and only wrapped when the measurement says they must be.
+    /// A `LazyVStack` would defeat this: inside a collapsed scroll view it
+    /// builds one row and reports that as the height.
+    @ViewBuilder
+    private var list: some View {
+        if contentHeight > maximumListHeight {
+            ScrollView { measuredRows }
+                .frame(height: maximumListHeight)
+        } else {
+            measuredRows
+        }
+    }
+
+    private var measuredRows: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(store.rows) { row in
+                ListenerRowView(row: row)
+            }
+        }
+        .padding(.vertical, 4)
+        .background(
+            GeometryReader { proxy in
+                Color.clear.preference(key: ContentHeightKey.self, value: proxy.size.height)
+            }
+        )
+        .onPreferenceChange(ContentHeightKey.self) { height in
+            contentHeight = height
+        }
     }
 
     private var header: some View {
@@ -90,5 +135,12 @@ struct MenuContent: View {
         case let .failed(reason):
             return "Port discovery failed. \(reason)"
         }
+    }
+}
+
+private struct ContentHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }

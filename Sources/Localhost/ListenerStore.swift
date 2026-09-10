@@ -24,6 +24,16 @@ final class ListenerStore {
         self.attributor = attributor
     }
 
+    /// Seeded with a scan that already happened, for previews and for
+    /// rendering the panel without a window server.
+    init(rows: [ListenerPresentation], oracle: OracleStatus) {
+        self.scanner = ListenerScanner()
+        self.attributor = ListenerAttributor()
+        self.rows = rows
+        self.oracle = oracle
+        self.hasScanned = true
+    }
+
     func refresh() async {
         let scanner = self.scanner
         let attributor = self.attributor

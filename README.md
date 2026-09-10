@@ -15,10 +15,13 @@ copy. Those arrive in step 3, deliberately after a week of daily use.
 ## Build
 
 ```sh
-swift build && swift test
-./Scripts/bundle.sh          # assembles .build/…/Localhost.app
-open "$(./Scripts/bundle.sh | tail -1)"
+swift test
+./Scripts/run.sh             # rebuild, re-bundle, relaunch
 ```
+
+Always launch through `Scripts/run.sh`. `swift build` updates the binary but
+not `Localhost.app`, so the running menu bar app quietly stays on old code —
+which looks exactly like a fix not working.
 
 The app is a menu bar agent, so nothing appears in the Dock — look for the
 network icon in the menu bar. Quit from the panel's footer.
@@ -32,6 +35,17 @@ To see the scan without the interface:
 ```sh
 "$(swift build --show-bin-path)/Localhost" --list
 ```
+
+To check the panel's layout without opening it on a screen:
+
+```sh
+"$(swift build --show-bin-path)/Localhost" --render /tmp/panel.png
+```
+
+This draws the real panel with live data. A menu bar panel is otherwise only
+inspectable by opening it, which makes layout regressions easy to miss —
+`ScrollView` reporting no intrinsic height once shrank the whole list to a
+single row, and the header count was the only clue.
 
 ## Layout
 
