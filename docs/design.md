@@ -397,6 +397,23 @@ Rows sit 9pt in from the panel edge with a 2pt gap between them, so a highlight
 reads as a row rather than a banner, and two adjacent highlights read as two
 things.
 
+### Modals
+
+Every modal in this app is an `NSAlert` run from the application, never a
+SwiftUI `confirmationDialog` or `alert` presented from the panel.
+
+A `MenuBarExtra` panel dismisses the moment it resigns key — which is exactly
+what presenting a dialog does. The panel vanished, taking the presenting view
+with it, and the confirmation never appeared. The bug shipped because a dialog
+that silently fails to present is invisible to every test and every screenshot:
+the code is reached, no error is raised, and nothing is drawn.
+
+`Localhost --window confirm` now raises the termination alert from the harness,
+and `Scripts/list-windows.swift <pid>` reports the windows that app owns. With
+the alert there are two — a modal at layer 8 above the panel; without it, one.
+That is the check, and it needs no accessibility permission and captures
+nothing from the screen.
+
 ### Corner geometry
 
 Rows highlight edge to edge, so against a rounded panel a highlight can draw

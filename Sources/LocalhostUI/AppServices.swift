@@ -95,6 +95,35 @@ public enum AppServices {
         }
     }
 
+    // MARK: - Confirming a termination
+
+    /// Asks before signalling, and returns which signal was chosen.
+    ///
+    /// This is an `NSAlert` rather than SwiftUI's `confirmationDialog` because
+    /// a `MenuBarExtra` panel dismisses the moment it resigns key — which is
+    /// exactly what presenting a dialog does. The panel vanished, taking the
+    /// presenting view with it, and the dialog never appeared. Every modal in
+    /// this app therefore goes through AppKit and is run from the application
+    /// rather than from the panel.
+    public static func confirmTermination(title: String, detail: String) -> ProcessTerminator.Signal? {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = title
+        alert.informativeText = detail
+        alert.addButton(withTitle: "Quit")
+        alert.addButton(withTitle: "Force Quit")
+        alert.addButton(withTitle: "Cancel")
+        alert.buttons[0].hasDestructiveAction = true
+        alert.buttons[1].hasDestructiveAction = true
+
+        switch alert.runModal() {
+        case .alertFirstButtonReturn: return .terminate
+        case .alertSecondButtonReturn: return .force
+        default: return nil
+        }
+    }
+
     // MARK: - Crash reports
 
     /// Offers to send a crash report, and never sends one on its own.

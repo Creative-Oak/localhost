@@ -49,7 +49,12 @@ Localhost --list                  # what the menu would show
 Localhost --window [dark]         # the panel in a real window, for screenshots
 Localhost --bench                 # per-phase timings
 Localhost --soak [pooled]         # footprint over 1000 scans
+Localhost --window confirm        # panel plus the termination alert
 ```
+
+`Scripts/list-windows.swift <pid>` lists the windows a process owns, which is
+how a modal is checked for actually appearing — a dialog that fails to present
+raises no error and draws nothing, so nothing else catches it.
 
 `Scripts/shoot-panel.sh out.png [dark]` captures the panel **by window id**, so
 only this app's window is ever in the picture. Use it rather than `ImageRenderer`

@@ -9,7 +9,6 @@ public struct MenuContent: View {
     @State private var expanded: Set<ListenerPresentation.Prominence> = []
     @State private var query = ""
     @State private var selection: Listener.ID?
-    @State private var pending: PendingTermination?
     @FocusState private var searchFocused: Bool
 
     /// Drives refreshes only when the panel is really on screen; the renderer
@@ -42,16 +41,9 @@ public struct MenuContent: View {
 
     /// One confirmation path, so quitting one process and quitting a project
     /// cannot drift apart.
-    private enum PendingTermination: Identifiable {
+    private enum PendingTermination {
         case one(ListenerPresentation)
         case project(ListenerSection)
-
-        var id: String {
-            switch self {
-            case let .one(row): return "one-\(row.id.pid)-\(row.id.port)"
-            case let .project(section): return "project-\(section.id)"
-            }
-        }
 
         var rows: [ListenerPresentation] {
             switch self {
@@ -145,17 +137,6 @@ public struct MenuContent: View {
             selection = nil
             return .handled
         }
-        .confirmationDialog(
-            pending?.title ?? "",
-            isPresented: Binding(get: { pending != nil }, set: { if !$0 { pending = nil } }),
-            titleVisibility: .visible
-        ) {
-            Button("Quit", role: .destructive) { confirm(using: .terminate) }
-            Button("Force Quit", role: .destructive) { confirm(using: .force) }
-            Button("Cancel", role: .cancel) { pending = nil }
-        } message: {
-            Text(pending?.detail ?? "")
-        }
         // Scanning is tied to the lifetime of this view, so it runs while the
         // menu is open and stops the moment it closes. No background polling.
         .task { if scans { await store.refreshUntilCancelled() } }
@@ -215,11 +196,7 @@ public struct MenuContent: View {
             ForEach(sections) { section in
                 if section.project != nil {
                     SectionHeaderView(section: section) {
-                        guard licenses.entitlement.canAct else {
-                            AppServices.promptForLicense(into: licenses)
-                            return
-                        }
-                        pending = .project(section)
+                        requestTermination(.project(section))
                     }
                 }
                 ForEach(section.rows) { row in
@@ -267,22 +244,25 @@ public struct MenuContent: View {
     private func perform(_ action: ListenerAction, on row: ListenerPresentation) {
         selection = row.id
         guard action != .terminate else {
-            // Discovery is never gated; changing the machine is.
-            guard licenses.entitlement.canAct else {
-                AppServices.promptForLicense(into: licenses)
-                return
-            }
             // The only irreversible action, so it never happens on one click.
-            pending = .one(row)
+            requestTermination(.one(row))
             return
         }
         ActionRunner.perform(action, on: row)
     }
 
-    private func confirm(using signal: ProcessTerminator.Signal) {
-        guard licenses.entitlement.canAct else { return }
-        guard let rows = pending?.rows, !rows.isEmpty else { return }
-        pending = nil
+    /// Gate, confirm, then act — in that order, and in one place, so quitting
+    /// one process and quitting a project cannot diverge.
+    private func requestTermination(_ target: PendingTermination) {
+        // Discovery is never gated; changing the machine is.
+        guard licenses.entitlement.canAct else {
+            AppServices.promptForLicense(into: licenses)
+            return
+        }
+        let rows = target.rows
+        guard !rows.isEmpty else { return }
+        guard let signal = AppServices.confirmTermination(
+            title: target.title, detail: target.detail) else { return }
         Task { await store.terminate(rows, using: signal) }
     }
 
@@ -439,7 +419,7 @@ public struct MenuContent: View {
             .padding(.horizontal, -12)
 
             if row.canTerminate {
-                Button("Free port \(String(row.listener.port))") { pending = .one(row) }
+                Button("Free port \(String(row.listener.port))") { requestTermination(.one(row)) }
                     .controlSize(.small)
             } else {
                 // Being honest about the limit is better than a button that

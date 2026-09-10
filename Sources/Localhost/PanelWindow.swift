@@ -13,7 +13,7 @@ import SwiftUI
 /// else on the screen.
 @MainActor
 enum PanelWindow {
-    static func show(dark: Bool, expandAll: Bool = false) {
+    static func show(dark: Bool, expandAll: Bool = false, confirmDemo: Bool = false) {
         let application = NSApplication.shared
         application.setActivationPolicy(.accessory)
 
@@ -67,6 +67,18 @@ enum PanelWindow {
 
         print("window: \(panel.windowNumber)")
         fflush(stdout)
+
+        // `--window confirm` raises the termination alert a moment after the
+        // panel appears, so that a modal can be checked for existence from
+        // outside. A dialog that silently fails to present is otherwise
+        // invisible to every test and every screenshot.
+        if confirmDemo {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                _ = AppServices.confirmTermination(
+                    title: "Quit campo — node (pid 60964) on port 3000?",
+                    detail: "Quit asks it to stop and lets it shut down cleanly. Force quit does not.")
+            }
+        }
         application.run()
     }
 }
