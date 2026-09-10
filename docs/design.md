@@ -219,12 +219,27 @@ Killing root-owned processes is a later conversation, if ever.
    names the process, and the identity re-check.
 4. ~~**Attribution.**~~ Done: cwd → project label, argv → runtime and version,
    `.git/HEAD` → branch, known daemons, Docker container names.
-5. **Search**, and *free this port*.
-6. **Polish.** Empty states, permission-denied states, VoiceOver labels, icon.
+5. ~~**Search**, and *free this port*.~~ Done, plus project grouping.
+6. ~~**Polish.**~~ Done: empty states, degraded and permission-denied states,
+   VoiceOver labels, Escape handling, a placeholder icon.
 7. **Ship.** Sign, notarise, trial, product page.
 
 Steps 2 and 3 are where the app will turn out to be subtly wrong about
 something. Using it daily before adding actions is deliberate, not caution.
+
+## Project stacks
+
+Grouping rows by project is the same idea as a competitor's "profiles", arrived
+at from the opposite direction. Rather than asking someone to declare that
+their frontend, API and database belong together, the group falls out of
+attribution that already happened: those rows resolve to the same project root,
+and Compose names its own project. Nothing is configured, so nothing can be
+configured wrongly.
+
+This is the boundary of what the app does with a stack. It groups them and it
+can quit them. It does not start them, because starting requires storing
+commands, and storing commands is the beginning of being a process supervisor —
+which needs a background daemon and fails product principle 9.
 
 ## Risks
 

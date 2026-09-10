@@ -81,6 +81,10 @@ public struct MenuContent: View {
             header
             search
 
+            if !store.oracle.isTrustworthy, store.hasScanned {
+                degradedBanner
+            }
+
             switch ListenerSearch.answer(for: query, rows: store.rows) {
             case let .free(port):
                 answer("\(port) is free", symbol: "checkmark.circle.fill", tint: .green)
@@ -111,6 +115,14 @@ public struct MenuContent: View {
         .onKeyPress(.upArrow) { move(by: -1); return .handled }
         .onKeyPress(.downArrow) { move(by: 1); return .handled }
         .onKeyPress(.return) { openSelected() }
+        // Escape clears a query first and dismisses the panel only when there
+        // is nothing to clear, so a typed search is never lost with the window.
+        .onKeyPress(.escape) {
+            guard !query.isEmpty else { return .ignored }
+            query = ""
+            selection = nil
+            return .handled
+        }
         .confirmationDialog(
             pending?.title ?? "",
             isPresented: Binding(get: { pending != nil }, set: { if !$0 { pending = nil } }),
@@ -265,6 +277,7 @@ public struct MenuContent: View {
             TextField("Port, project or process", text: $query)
                 .textFieldStyle(.plain)
                 .focused($searchFocused)
+                .accessibilityLabel("Search by port, project or process")
             if !query.isEmpty {
                 Button {
                     query = ""
@@ -290,6 +303,8 @@ public struct MenuContent: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(text)
     }
 
     /// The point of the whole search field: a port you want, and the one thing
@@ -318,6 +333,8 @@ public struct MenuContent: View {
                 Text("It belongs to another user, so Localhost cannot free it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .accessibilityLabel(
+                        "Port \(row.listener.port) belongs to another user and cannot be freed.")
             }
         }
         .padding(.horizontal, 12)
@@ -346,6 +363,10 @@ public struct MenuContent: View {
         }
         .buttonStyle(.plain)
         .help("Services on ports nobody chose — high, operating-system-assigned ports")
+        .accessibilityLabel(showsBackground
+            ? "Hide background services"
+            : "Show \(background.count) background services")
+        .accessibilityAddTraits(.isButton)
     }
 
     @ViewBuilder
@@ -360,7 +381,45 @@ public struct MenuContent: View {
     private var emptyMessage: String {
         if !store.hasScanned { return "Scanning…" }
         if !query.isEmpty { return "Nothing matches \"\(query)\"." }
+        if case .failed = store.oracle { return "Could not read the port table." }
         return "Nothing is listening."
+    }
+
+    /// Says what is missing and why, because a shorter list is otherwise
+    /// indistinguishable from a quiet machine.
+    private var degradedBanner: some View {
+        HStack(alignment: .top, spacing: 7) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(degradedHeadline).font(.caption).fontWeight(.medium)
+                Text(degradedDetail).font(.caption2).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.orange.opacity(0.1))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(degradedHeadline). \(degradedDetail)")
+    }
+
+    private var degradedHeadline: String {
+        if case .failed = store.oracle { return "Port discovery failed" }
+        return "Showing your own processes only"
+    }
+
+    private var degradedDetail: String {
+        switch store.oracle {
+        case .verified:
+            return ""
+        case .degraded:
+            // The private-struct parse stopped agreeing with libproc, so
+            // listeners owned by other users cannot be trusted or named.
+            return "macOS may have changed since this version shipped. Listeners owned by other users are hidden."
+        case let .failed(reason):
+            return reason
+        }
     }
 
     private func actionErrorBanner(_ message: String) -> some View {

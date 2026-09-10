@@ -93,6 +93,10 @@ public struct ListenerRowView: View {
         .help(tooltip)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
+        .accessibilityHint(row.supports(.openInBrowser)
+            ? "Opens http://localhost:\(row.listener.port)"
+            : "")
+        .accessibilityAddTraits(row.supports(.openInBrowser) ? .isButton : [])
     }
 
     /// The second line never repeats the first.
@@ -137,7 +141,10 @@ public struct ListenerRowView: View {
     private var accessibilityLabel: String {
         var parts = ["Port \(row.listener.port)"]
         if let label = row.label { parts.append(label) }
+        if let branch = row.branch { parts.append("branch \(branch)") }
+        if let runtime = row.runtime { parts.append(runtime.description) }
         parts.append(process.name)
+        if !process.isOurs { parts.append("owned by another user") }
         if row.isExposedDevServer { parts.append("reachable from your network") }
         return parts.joined(separator: ", ")
     }
