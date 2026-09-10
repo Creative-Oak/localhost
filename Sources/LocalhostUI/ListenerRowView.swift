@@ -4,16 +4,27 @@ import SwiftUI
 public struct ListenerRowView: View {
     let row: ListenerPresentation
     var isSelected: Bool = false
+    /// Inside a project group the heading already carries the project name and
+    /// branch, so the row says what it *is* instead of repeating them.
+    var inGroup: Bool = false
     var onAction: (ListenerAction) -> Void = { _ in }
 
     public init(
         row: ListenerPresentation,
         isSelected: Bool = false,
+        inGroup: Bool = false,
         onAction: @escaping (ListenerAction) -> Void = { _ in }
     ) {
         self.row = row
         self.isSelected = isSelected
+        self.inGroup = inGroup
         self.onAction = onAction
+    }
+
+    /// The first line: what this row is, without repeating its heading.
+    private var primary: String {
+        if inGroup { return row.runtime?.description ?? process.name }
+        return row.label ?? process.name
     }
 
     private var process: ProcessIdentity { row.listener.process }
@@ -28,12 +39,12 @@ public struct ListenerRowView: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 5) {
-                    Text(row.label ?? process.name)
-                        .fontWeight(row.label == nil ? .regular : .medium)
+                    Text(primary)
+                        .fontWeight(row.label == nil && !inGroup ? .regular : .medium)
                         .lineLimit(1)
                         .truncationMode(.middle)
 
-                    if let branch = row.branch {
+                    if let branch = row.branch, !inGroup {
                         Text(branch)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -87,6 +98,13 @@ public struct ListenerRowView: View {
     /// The second line never repeats the first.
     private var secondary: String? {
         if let advice = row.advice { return advice }
+        // The runtime is already the first line here, and for something like
+        // Python the runtime and the process share a name.
+        if inGroup {
+            return primary == process.name
+                ? "pid \(process.pid)"
+                : "\(process.name) · \(process.pid)"
+        }
         if case let .container(container) = row.attribution {
             return container.image.isEmpty ? "container" : container.image
         }

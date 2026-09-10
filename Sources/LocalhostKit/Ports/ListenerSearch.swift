@@ -37,8 +37,30 @@ public enum ListenerSearch {
 
     /// Whether the query names a port that nothing is listening on.
     public static func freePort(in query: String, rows: [ListenerPresentation]) -> UInt16? {
-        guard let port = port(in: query) else { return nil }
-        guard !rows.contains(where: { $0.listener.port == port }) else { return nil }
+        guard case .free(let port) = answer(for: query, rows: rows) else { return nil }
         return port
+    }
+
+    /// The direct answer to "what about port N?".
+    ///
+    /// Typing a port is a question, and all three answers are useful: it is
+    /// free, something of yours has it and can be moved aside, or something
+    /// that is not yours has it and cannot.
+    public enum Answer: Hashable, Sendable {
+        case free(UInt16)
+        case taken(ListenerPresentation)
+        /// The query was not a port at all, so there is nothing to answer.
+        case notAPort
+    }
+
+    public static func answer(for query: String, rows: [ListenerPresentation]) -> Answer {
+        guard let port = port(in: query) else { return .notAPort }
+        // A process of ours is the more useful answer when several rows share a
+        // port, because it is the one that can actually be moved aside.
+        let holders = rows.filter { $0.listener.port == port }
+        guard let holder = holders.first(where: { $0.canTerminate }) ?? holders.first else {
+            return .free(port)
+        }
+        return .taken(holder)
     }
 }

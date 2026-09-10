@@ -65,15 +65,30 @@ public final class ListenerStore {
         _ row: ListenerPresentation,
         using signal: ProcessTerminator.Signal = .terminate
     ) async {
-        do {
-            try terminator.terminate(row.listener.process, using: signal)
-            actionError = nil
-        } catch let failure as ProcessTerminator.Failure {
-            // "Already exited" is the outcome the user wanted, not an error.
-            actionError = failure == .alreadyExited ? nil : failure.description
-        } catch {
-            actionError = error.localizedDescription
+        await terminate([row], using: signal)
+    }
+
+    /// Signals several processes as one action, for quitting a whole project.
+    ///
+    /// Each one is verified independently, so a single stale row in the group
+    /// stops only itself. Failures are reported together rather than the first
+    /// one silently winning.
+    public func terminate(
+        _ rows: [ListenerPresentation],
+        using signal: ProcessTerminator.Signal = .terminate
+    ) async {
+        var failures: [String] = []
+        for row in rows {
+            do {
+                try terminator.terminate(row.listener.process, using: signal)
+            } catch let failure as ProcessTerminator.Failure {
+                // "Already exited" is the outcome that was wanted, not an error.
+                if failure != .alreadyExited { failures.append(failure.description) }
+            } catch {
+                failures.append(error.localizedDescription)
+            }
         }
+        actionError = failures.isEmpty ? nil : Set(failures).sorted().joined(separator: " ")
         await refresh()
     }
 

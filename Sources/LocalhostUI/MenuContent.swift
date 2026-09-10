@@ -8,8 +8,9 @@ public struct MenuContent: View {
     @State private var showsBackground = false
     @State private var query = ""
     @State private var selection: Listener.ID?
-    @State private var pendingTermination: ListenerPresentation?
+    @State private var pending: PendingTermination?
     @FocusState private var searchFocused: Bool
+
     /// Drives refreshes only when the panel is really on screen; the renderer
     /// seeds its own data and must not start a scan loop.
     private let scans: Bool
@@ -27,17 +28,70 @@ public struct MenuContent: View {
         self.maximumListHeight = maximumListHeight
     }
 
+    /// One confirmation path, so quitting one process and quitting a project
+    /// cannot drift apart.
+    private enum PendingTermination: Identifiable {
+        case one(ListenerPresentation)
+        case project(ListenerSection)
+
+        var id: String {
+            switch self {
+            case let .one(row): return "one-\(row.id.pid)-\(row.id.port)"
+            case let .project(section): return "project-\(section.id)"
+            }
+        }
+
+        var rows: [ListenerPresentation] {
+            switch self {
+            case let .one(row): return [row]
+            case let .project(section): return section.terminableRows
+            }
+        }
+
+        var title: String {
+            switch self {
+            case let .one(row): return "Quit \(row.terminationDescription)?"
+            case let .project(section):
+                let count = section.terminableRows.count
+                return "Quit \(count) process\(count == 1 ? "" : "es") in \(section.project ?? "this project")?"
+            }
+        }
+
+        /// A bulk action names every process it will signal. The blast radius
+        /// is larger than one row, so it is spelled out rather than counted.
+        var detail: String {
+            switch self {
+            case .one:
+                return "Quit asks it to stop and lets it shut down cleanly. Force quit does not."
+            case let .project(section):
+                let names = section.terminableRows
+                    .map { "\($0.listener.port) \($0.listener.process.name)" }
+                    .joined(separator: "\n")
+                let skipped = section.rows.count - section.terminableRows.count
+                let note = skipped > 0
+                    ? "\n\n\(skipped) other listener\(skipped == 1 ? "" : "s") in this project belong to another user and will be left alone."
+                    : ""
+                return names + note
+            }
+        }
+    }
+
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
             search
 
-            if let freePort {
-                answer("\(freePort) is free", symbol: "checkmark.circle.fill", tint: .green)
-            } else if listed.isEmpty, background.isEmpty {
-                emptyState
-            } else {
-                list
+            switch ListenerSearch.answer(for: query, rows: store.rows) {
+            case let .free(port):
+                answer("\(port) is free", symbol: "checkmark.circle.fill", tint: .green)
+            case let .taken(row):
+                takenAnswer(row)
+            case .notAPort:
+                if sections.isEmpty, background.isEmpty {
+                    emptyState
+                } else {
+                    list
+                }
             }
 
             if !background.isEmpty {
@@ -45,7 +99,7 @@ public struct MenuContent: View {
             }
 
             if let message = store.actionError {
-                actionError(message)
+                actionErrorBanner(message)
             }
 
             Divider()
@@ -58,29 +112,38 @@ public struct MenuContent: View {
         .onKeyPress(.downArrow) { move(by: 1); return .handled }
         .onKeyPress(.return) { openSelected() }
         .confirmationDialog(
-            pendingTermination.map { "Quit \($0.terminationDescription)?" } ?? "",
-            isPresented: Binding(
-                get: { pendingTermination != nil },
-                set: { if !$0 { pendingTermination = nil } }),
+            pending?.title ?? "",
+            isPresented: Binding(get: { pending != nil }, set: { if !$0 { pending = nil } }),
             titleVisibility: .visible
         ) {
-            Button("Quit Process", role: .destructive) {
-                guard let row = pendingTermination else { return }
-                pendingTermination = nil
-                Task { await store.terminate(row, using: .terminate) }
-            }
-            Button("Force Quit", role: .destructive) {
-                guard let row = pendingTermination else { return }
-                pendingTermination = nil
-                Task { await store.terminate(row, using: .force) }
-            }
-            Button("Cancel", role: .cancel) { pendingTermination = nil }
+            Button("Quit", role: .destructive) { confirm(using: .terminate) }
+            Button("Force Quit", role: .destructive) { confirm(using: .force) }
+            Button("Cancel", role: .cancel) { pending = nil }
         } message: {
-            Text("Quit asks it to stop and lets it shut down cleanly. Force quit does not.")
+            Text(pending?.detail ?? "")
         }
         // Scanning is tied to the lifetime of this view, so it runs while the
         // menu is open and stops the moment it closes. No background polling.
         .task { if scans { await store.refreshUntilCancelled() } }
+    }
+
+    // MARK: - Rows
+
+    private var listed: [ListenerPresentation] {
+        ListenerSearch.filter(store.rows.filter { $0.prominence == .listed }, query: query)
+    }
+
+    private var background: [ListenerPresentation] {
+        ListenerSearch.filter(store.rows.filter { $0.prominence == .background }, query: query)
+    }
+
+    private var sections: [ListenerSection] {
+        ListenerGrouping.sections(from: listed)
+    }
+
+    /// Everything on screen, in the order the arrow keys should walk it.
+    private var visible: [ListenerPresentation] {
+        showsBackground ? listed + background : listed
     }
 
     /// A scroll view appears only once the rows genuinely overflow.
@@ -89,8 +152,6 @@ public struct MenuContent: View {
     /// unconditionally collapses the panel to a single row inside
     /// `MenuBarExtra`'s window sizing. The rows are therefore laid out and
     /// measured first, and only wrapped when the measurement says they must be.
-    /// A `LazyVStack` would defeat this: inside a collapsed scroll view it
-    /// builds one row and reports that as the height.
     @ViewBuilder
     private var list: some View {
         if contentHeight > maximumListHeight {
@@ -101,33 +162,58 @@ public struct MenuContent: View {
         }
     }
 
-    private var listed: [ListenerPresentation] {
-        ListenerSearch.filter(store.rows.filter { $0.prominence == .listed }, query: query)
+    private var measuredRows: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(sections) { section in
+                if section.project != nil {
+                    SectionHeaderView(section: section) { pending = .project(section) }
+                }
+                ForEach(section.rows) { row in
+                    ListenerRowView(
+                        row: row,
+                        isSelected: row.id == selection,
+                        inGroup: section.project != nil
+                    ) { action in
+                        perform(action, on: row)
+                    }
+                    .padding(.leading, section.project == nil ? 0 : 10)
+                }
+            }
+            if showsBackground {
+                ForEach(background) { row in
+                    ListenerRowView(row: row, isSelected: row.id == selection) { action in
+                        perform(action, on: row)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 4)
+        .background(
+            GeometryReader { proxy in
+                Color.clear.preference(key: ContentHeightKey.self, value: proxy.size.height)
+            }
+        )
+        .onPreferenceChange(ContentHeightKey.self) { height in
+            contentHeight = height
+        }
     }
 
-    private var background: [ListenerPresentation] {
-        ListenerSearch.filter(store.rows.filter { $0.prominence == .background }, query: query)
-    }
-
-    /// A port the query names that nothing holds. This is an answer, not an
-    /// empty result, so it gets said out loud.
-    private var freePort: UInt16? {
-        ListenerSearch.freePort(in: query, rows: store.rows)
-    }
-
-    /// Everything on screen, in the order the arrow keys should walk it.
-    private var visible: [ListenerPresentation] {
-        showsBackground ? listed + background : listed
-    }
+    // MARK: - Actions
 
     private func perform(_ action: ListenerAction, on row: ListenerPresentation) {
         selection = row.id
         guard action != .terminate else {
             // The only irreversible action, so it never happens on one click.
-            pendingTermination = row
+            pending = .one(row)
             return
         }
         ActionRunner.perform(action, on: row)
+    }
+
+    private func confirm(using signal: ProcessTerminator.Signal) {
+        guard let rows = pending?.rows, !rows.isEmpty else { return }
+        pending = nil
+        Task { await store.terminate(rows, using: signal) }
     }
 
     private func move(by offset: Int) {
@@ -137,12 +223,10 @@ public struct MenuContent: View {
             selection = rows.first?.id
             return
         }
-        let next = min(max(index + offset, 0), rows.count - 1)
-        selection = rows[next].id
+        selection = rows[min(max(index + offset, 0), rows.count - 1)].id
     }
 
     private func openSelected() -> KeyPress.Result {
-        // With a port typed and nothing holding it, Return has nothing to open.
         guard let selection, let row = visible.first(where: { $0.id == selection }) else {
             guard let first = visible.first else { return .ignored }
             self.selection = first.id
@@ -154,22 +238,23 @@ public struct MenuContent: View {
         return .handled
     }
 
-    private func actionError(_ message: String) -> some View {
-        HStack(spacing: 7) {
-            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-            Text(message).font(.caption).lineLimit(2)
-            Spacer(minLength: 0)
-            Button {
-                store.dismissActionError()
-            } label: {
-                Image(systemName: "xmark").font(.caption2)
+    // MARK: - Chrome
+
+    private var header: some View {
+        HStack {
+            Text("Listening")
+                .font(.headline)
+            Spacer()
+            if store.hasScanned {
+                Text("\(listed.count)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Dismiss")
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 7)
-        .background(.orange.opacity(0.1))
+        .padding(.top, 10)
+        .padding(.bottom, 6)
     }
 
     private var search: some View {
@@ -197,23 +282,46 @@ public struct MenuContent: View {
         .onAppear { searchFocused = true }
     }
 
-    private var measuredRows: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(visible) { row in
-                ListenerRowView(row: row, isSelected: row.id == selection) { action in
-                    perform(action, on: row)
-                }
+    private func answer(_ text: String, symbol: String, tint: Color) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: symbol).foregroundStyle(tint)
+            Text(text).fontWeight(.medium)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+    }
+
+    /// The point of the whole search field: a port you want, and the one thing
+    /// standing in the way of having it.
+    private func takenAnswer(_ row: ListenerPresentation) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 7) {
+                Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange)
+                Text("\(row.listener.port) is taken by \(row.label ?? row.listener.process.name)")
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 0)
+            }
+            ListenerRowView(row: row, isSelected: false) { action in
+                perform(action, on: row)
+            }
+            .padding(.horizontal, -12)
+
+            if row.canTerminate {
+                Button("Free port \(String(row.listener.port))") { pending = .one(row) }
+                    .controlSize(.small)
+            } else {
+                // Being honest about the limit is better than a button that
+                // always fails: v1 signals only your own processes.
+                Text("It belongs to another user, so Localhost cannot free it.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
-        .padding(.vertical, 4)
-        .background(
-            GeometryReader { proxy in
-                Color.clear.preference(key: ContentHeightKey.self, value: proxy.size.height)
-            }
-        )
-        .onPreferenceChange(ContentHeightKey.self) { height in
-            contentHeight = height
-        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
     }
 
     /// Folded away, never hidden: telling someone nothing is on 44950 when
@@ -240,33 +348,6 @@ public struct MenuContent: View {
         .help("Services on ports nobody chose — high, operating-system-assigned ports")
     }
 
-    private var header: some View {
-        HStack {
-            Text("Listening")
-                .font(.headline)
-            Spacer()
-            if store.hasScanned {
-                Text("\(listed.count)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.top, 10)
-        .padding(.bottom, 6)
-    }
-
-    private func answer(_ text: String, symbol: String, tint: Color) -> some View {
-        HStack(spacing: 7) {
-            Image(systemName: symbol).foregroundStyle(tint)
-            Text(text).fontWeight(.medium)
-            Spacer()
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
-    }
-
     @ViewBuilder
     private var emptyState: some View {
         Text(emptyMessage)
@@ -280,6 +361,24 @@ public struct MenuContent: View {
         if !store.hasScanned { return "Scanning…" }
         if !query.isEmpty { return "Nothing matches \"\(query)\"." }
         return "Nothing is listening."
+    }
+
+    private func actionErrorBanner(_ message: String) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            Text(message).font(.caption).lineLimit(2)
+            Spacer(minLength: 0)
+            Button {
+                store.dismissActionError()
+            } label: {
+                Image(systemName: "xmark").font(.caption2)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(.orange.opacity(0.1))
     }
 
     private var footer: some View {
@@ -308,12 +407,9 @@ public struct MenuContent: View {
 
     private var oracleExplanation: String {
         switch store.oracle {
-        case .verified:
-            return ""
-        case let .degraded(reason):
-            return "Showing your own processes only. \(reason)"
-        case let .failed(reason):
-            return "Port discovery failed. \(reason)"
+        case .verified: return ""
+        case let .degraded(reason): return "Showing your own processes only. \(reason)"
+        case let .failed(reason): return "Port discovery failed. \(reason)"
         }
     }
 }
