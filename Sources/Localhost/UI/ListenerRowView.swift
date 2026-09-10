@@ -21,7 +21,7 @@ struct ListenerRowView: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
 
-                    if row.listener.isExposed {
+                    if row.isExposedDevServer {
                         Image(systemName: "dot.radiowaves.left.and.right")
                             .font(.caption2)
                             .foregroundStyle(.orange)
@@ -52,7 +52,9 @@ struct ListenerRowView: View {
     private var secondary: String? {
         if let advice = row.advice { return advice }
         if row.label != nil { return "\(process.name) · \(process.pid)" }
-        if !process.isOurs { return "another user · \(process.pid)" }
+        // The primary line is already the process name here, so say who owns it
+        // rather than repeating it. "another user · 1" was true and unhelpful.
+        if !process.isOurs { return process.uid == 0 ? "root" : "uid \(process.uid)" }
         return "pid \(process.pid)"
     }
 
@@ -71,7 +73,22 @@ struct ListenerRowView: View {
         var parts = ["Port \(row.listener.port)"]
         if let label = row.label { parts.append(label) }
         parts.append(process.name)
-        if row.listener.isExposed { parts.append("reachable from your network") }
+        if row.isExposedDevServer { parts.append("reachable from your network") }
         return parts.joined(separator: ", ")
+    }
+}
+
+extension ListenerPresentation {
+    /// Worth warning about only when it is something you started.
+    ///
+    /// "Ours" is not enough of a test: AirPlay and Remote Desktop run as the
+    /// logged-in user and bind wildcard addresses as a matter of course, so
+    /// including them lit up most of the list and trained the reader to ignore
+    /// the indicator. A known daemon on every interface is expected; your own
+    /// dev server on every interface is the news.
+    var isExposedDevServer: Bool {
+        guard listener.isExposed, listener.process.isOurs else { return false }
+        if case .knownDaemon = attribution { return false }
+        return true
     }
 }

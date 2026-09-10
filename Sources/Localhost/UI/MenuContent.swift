@@ -5,6 +5,7 @@ struct MenuContent: View {
     @State private var store: ListenerStore
     /// Height of the row list, measured rather than assumed.
     @State private var contentHeight: CGFloat = 0
+    @State private var showsBackground = false
     /// Drives refreshes only when the panel is really on screen; the renderer
     /// seeds its own data and must not start a scan loop.
     private let scans: Bool
@@ -26,10 +27,14 @@ struct MenuContent: View {
         VStack(alignment: .leading, spacing: 0) {
             header
 
-            if store.rows.isEmpty {
+            if listed.isEmpty, background.isEmpty {
                 emptyState
             } else {
                 list
+            }
+
+            if !background.isEmpty {
+                backgroundDisclosure
             }
 
             Divider()
@@ -59,10 +64,23 @@ struct MenuContent: View {
         }
     }
 
+    private var listed: [ListenerPresentation] {
+        store.rows.filter { $0.prominence == .listed }
+    }
+
+    private var background: [ListenerPresentation] {
+        store.rows.filter { $0.prominence == .background }
+    }
+
     private var measuredRows: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(store.rows) { row in
+            ForEach(listed) { row in
                 ListenerRowView(row: row)
+            }
+            if showsBackground {
+                ForEach(background) { row in
+                    ListenerRowView(row: row)
+                }
             }
         }
         .padding(.vertical, 4)
@@ -76,13 +94,37 @@ struct MenuContent: View {
         }
     }
 
+    /// Folded away, never hidden: telling someone nothing is on 44950 when
+    /// something is would be worse than the clutter.
+    private var backgroundDisclosure: some View {
+        Button {
+            withAnimation(.snappy(duration: 0.15)) { showsBackground.toggle() }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: showsBackground ? "chevron.down" : "chevron.right")
+                    .font(.caption2)
+                Text(showsBackground
+                     ? "Hide background services"
+                     : "\(background.count) background services")
+                Spacer()
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Services on ports nobody chose — high, operating-system-assigned ports")
+    }
+
     private var header: some View {
         HStack {
             Text("Listening")
                 .font(.headline)
             Spacer()
             if store.hasScanned {
-                Text("\(store.rows.count)")
+                Text("\(listed.count)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()

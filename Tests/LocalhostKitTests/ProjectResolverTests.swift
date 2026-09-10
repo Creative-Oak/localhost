@@ -218,3 +218,48 @@ struct AttributionTests {
         #expect(rows.first?.label == nil)
     }
 }
+
+@Suite("Prominence")
+struct ProminenceTests {
+    private func row(port: UInt16, name: String, cwd: String?) -> Listener {
+        Listener(
+            port: port,
+            addresses: ["127.0.0.1"],
+            families: [.ipv4],
+            process: ProcessIdentity(
+                pid: 10, startedAt: 1, uid: getuid(), name: name, workingDirectory: cwd))
+    }
+
+    @Test("a daemon on a random high port folds away")
+    func highPortDaemonIsBackground() {
+        let rows = ListenerAttributor().present([row(port: 55778, name: "rapportd", cwd: "/")])
+        #expect(rows.first?.prominence == .background)
+    }
+
+    @Test("a port a person would choose stays listed", arguments: [80, 443, 3000, 5432, 8080] as [UInt16])
+    func chosenPortsAreListed(port: UInt16) {
+        let rows = ListenerAttributor().present([row(port: port, name: "node", cwd: "/")])
+        #expect(rows.first?.prominence == .listed)
+    }
+
+    @Test("a resolved project is listed whatever the port")
+    func projectAlwaysWinsOverPortNumber() throws {
+        let directory = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("prominence-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try #"{"name": "late-bound"}"#
+            .write(to: directory.appendingPathComponent("package.json"), atomically: true, encoding: .utf8)
+
+        let rows = ListenerAttributor().present([row(port: 61330, name: "node", cwd: directory.path)])
+        #expect(rows.first?.label == "late-bound")
+        #expect(rows.first?.prominence == .listed, "a project must never be folded away")
+    }
+
+    @Test("a known daemon on a high port is still listed")
+    func knownDaemonIsListed() {
+        // Not currently reachable via the table, but the rule must not depend
+        // on the port for something we can actually explain.
+        let rows = ListenerAttributor().present([row(port: 5900, name: "launchd", cwd: "/")])
+        #expect(rows.first?.prominence == .listed)
+    }
+}

@@ -18,10 +18,41 @@ public struct ListenerPresentation: Identifiable, Hashable, Sendable {
         case nothing
     }
 
+    /// Whether a row belongs in the list or behind the disclosure.
+    ///
+    /// The question this app exists to answer is "what has my port, and which
+    /// project is it?". A daemon on a random high port is never the answer, and
+    /// on a normal machine there are more of those than there are real ones.
+    public enum Prominence: Hashable, Sendable {
+        /// Something a developer might plausibly be looking for.
+        case listed
+        /// A background service on a port nobody chose. Still shown, but folded
+        /// away — never hidden, because "nothing is on 44950" would be a lie.
+        case background
+    }
+
     public let listener: Listener
     public let attribution: Attribution
 
     public var id: Listener.ID { listener.id }
+
+    /// Ports at or below this are ones a person picks: 80, 443, 3000, 5432,
+    /// 8080, 9000. Above it, almost everything is a service that asked the
+    /// operating system for whatever was free.
+    static let highestChosenPort: UInt16 = 10_000
+
+    public var prominence: Prominence {
+        switch attribution {
+        // A resolved project is the whole point of the app, whatever the port.
+        case .project:
+            return .listed
+        // "Why can't I bind 5000?" is the question the daemon table answers.
+        case .knownDaemon:
+            return .listed
+        case .unavailable, .nothing:
+            return listener.port <= Self.highestChosenPort ? .listed : .background
+        }
+    }
 
     /// The label shown in the third column, or `nil` for none.
     public var label: String? {
