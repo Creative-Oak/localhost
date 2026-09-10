@@ -42,6 +42,20 @@ To see the scan without the interface:
 "$(swift build --show-bin-path)/Localhost" --list
 ```
 
+Diagnostics, all on the same binary:
+
+```sh
+Localhost --list                  # what the menu would show
+Localhost --window [dark]         # the panel in a real window, for screenshots
+Localhost --bench                 # per-phase timings
+Localhost --soak [pooled]         # footprint over 1000 scans
+```
+
+`Scripts/shoot-panel.sh out.png [dark]` captures the panel **by window id**, so
+only this app's window is ever in the picture. Use it rather than `ImageRenderer`
+for anything involving materials, vibrancy or selection — `ImageRenderer` draws
+the view tree with no window behind it and cannot show any of them.
+
 To check the panel's layout without opening it on a screen:
 
 ```sh

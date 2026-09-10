@@ -39,7 +39,7 @@ public struct ProcessDetails: Sendable {
 
     // MARK: - Facts
 
-    static func bsdInfo(of pid: pid_t) -> proc_bsdinfo? {
+    public static func bsdInfo(of pid: pid_t) -> proc_bsdinfo? {
         var info = proc_bsdinfo()
         let size = Int32(MemoryLayout<proc_bsdinfo>.size)
         let read = withUnsafeMutablePointer(to: &info) {
@@ -49,7 +49,7 @@ public struct ProcessDetails: Sendable {
     }
 
     /// Available for every same-user process, and the basis of the project column.
-    static func workingDirectory(of pid: pid_t) -> String? {
+    public static func workingDirectory(of pid: pid_t) -> String? {
         var paths = proc_vnodepathinfo()
         let size = Int32(MemoryLayout<proc_vnodepathinfo>.size)
         let read = withUnsafeMutablePointer(to: &paths) {
@@ -62,7 +62,7 @@ public struct ProcessDetails: Sendable {
 
     /// Succeeds even for processes that deny everything else, so root-owned
     /// listeners can still be named.
-    static func executablePath(of pid: pid_t) -> String? {
+    public static func executablePath(of pid: pid_t) -> String? {
         var buffer = [UInt8](repeating: 0, count: 4 * Int(MAXPATHLEN))
         let written = buffer.withUnsafeMutableBufferPointer { raw -> Int32 in
             guard let base = raw.baseAddress else { return 0 }
@@ -75,7 +75,7 @@ public struct ProcessDetails: Sendable {
         return path.isEmpty ? nil : path
     }
 
-    static func arguments(of pid: pid_t) -> [String]? {
+    public static func arguments(of pid: pid_t) -> [String]? {
         var mib = [CTL_KERN, KERN_PROCARGS2, pid]
         var size = argumentMaximum
         var buffer = [UInt8](repeating: 0, count: size)

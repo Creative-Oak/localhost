@@ -20,6 +20,16 @@ enum Main {
             Diagnostics.renderPanel(to: CommandLine.arguments[index + 1])
             return
         }
+        if CommandLine.arguments.contains("--soak") {
+            Benchmark.soak(
+                iterations: 1000,
+                pooled: CommandLine.arguments.contains("pooled"))
+            return
+        }
+        if CommandLine.arguments.contains("--bench") {
+            Benchmark.run()
+            return
+        }
         // `--window [dark]` opens the panel as a real window for screenshotting.
         if CommandLine.arguments.contains("--window") {
             PanelWindow.show(dark: CommandLine.arguments.contains("dark"))

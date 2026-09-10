@@ -307,3 +307,46 @@ the macOS 26 SDKs are installed. Anything written against macOS 27 APIs could
 be neither compiled nor tested, so it would be guesswork. The work above is
 current-HIG and uses semantic materials and colours throughout, which is what
 carries forward.
+
+## Performance
+
+Measured on a release build, 578 processes, 17 listeners. Instinct was wrong
+twice here, which is the argument for measuring at all.
+
+```
+sysctl pcblist_n              0.22 ms
+libproc (oracle)              1.66 ms      <- 65% of the pipeline
+KERN_PROCARGS2 (13 procs)     0.13 ms
+ProjectResolver (17 rows)     0.23 ms
+GitBranch (17 rows)           0.26 ms
+Docker /containers/json       0.43 ms
+whole pipeline                2.55 ms
+```
+
+`kern.argmax` is 1MB, so reading argv allocates a megabyte per process. That
+looked like the obvious hotspot and is not one: the allocation is lazy and
+costs about 10µs. It was left alone.
+
+The oracle is the dominant cost, because verifying the private-struct parse
+means a full libproc sweep of every process on every scan. It could be cached —
+struct layout cannot change while the app is running — but 1.6 ms every two
+seconds, only while the menu is open, does not justify putting state into the
+one mechanism that prevents misattribution. Left alone deliberately.
+
+**Idle cost is the number that matters, and it is zero.** With the menu closed,
+the app consumed 0.00 CPU-seconds over 20 seconds. Product principle 9 holds by
+construction: the refresh loop lives on the view's `task`, which is cancelled
+when the panel closes.
+
+### The one real problem
+
+Repeated scanning grew the footprint by about 22KB per scan — roughly 39MB per
+hour with the menu open, unbounded. Autoreleased Foundation objects, with no
+run loop to drain them off the main thread. Over 1000 scans: **+21.6MB
+unpooled, +0.2MB pooled, and flat after the first few hundred.**
+
+The pools therefore live in `ListenerScanner.scan` and
+`ListenerAttributor.present` rather than at the call site, because the churn is
+inherent to what those functions do and any caller would otherwise have to know
+that. `FootprintTests` asserts the drift stays bounded, since nothing else
+catches this: the scan was correct, fast, and quietly growing.

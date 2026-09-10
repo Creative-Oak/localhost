@@ -119,6 +119,13 @@ public struct ListenerAttributor: Sendable {
     }
 
     public func present(_ listeners: [Listener]) -> [ListenerPresentation] {
+        // See ListenerScanner.scan: project resolution and branch reading are
+        // heavy in autoreleased Foundation objects, and this runs off the main
+        // thread every two seconds for as long as the menu is open.
+        autoreleasepool { presenting(listeners) }
+    }
+
+    private func presenting(_ listeners: [Listener]) -> [ListenerPresentation] {
         // One request per scan, hard-bounded, and an empty map on any failure.
         let published = containers.byPublishedPort()
         return listeners
