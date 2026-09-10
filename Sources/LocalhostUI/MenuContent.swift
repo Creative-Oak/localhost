@@ -104,11 +104,6 @@ public struct MenuContent: View {
                 }
             }
 
-            ForEach(foldedTiers, id: \.prominence) { tier in
-                if !rows(tier.prominence).isEmpty {
-                    disclosure(for: tier.prominence, title: tier.title, help: tier.help)
-                }
-            }
 
             if let message = store.actionError {
                 actionErrorBanner(message)
@@ -173,9 +168,9 @@ public struct MenuContent: View {
     /// The tiers that fold away, in the order they appear beneath the list.
     private var foldedTiers: [(prominence: ListenerPresentation.Prominence, title: String, help: String)] {
         [
-            (.application, "application",
+            (.application, "Applications",
              "Applications of yours that happen to listen — launchers, sync clients, editor helpers"),
-            (.system, "system listener",
+            (.system, "System",
              "Daemons, launchd-held sockets and processes belonging to other users"),
         ]
     }
@@ -223,10 +218,13 @@ public struct MenuContent: View {
                 }
             }
             ForEach(foldedTiers, id: \.prominence) { tier in
-                if reveals(tier.prominence) {
-                    ForEach(rows(tier.prominence)) { row in
-                        ListenerRowView(row: row, isSelected: row.id == selection) { action in
-                            perform(action, on: row)
+                if !rows(tier.prominence).isEmpty {
+                    tierHeading(for: tier.prominence, title: tier.title, help: tier.help)
+                    if reveals(tier.prominence) {
+                        ForEach(rows(tier.prominence)) { row in
+                            ListenerRowView(row: row, isSelected: row.id == selection) { action in
+                                perform(action, on: row)
+                            }
                         }
                     }
                 }
@@ -381,9 +379,15 @@ public struct MenuContent: View {
         .padding(.vertical, 10)
     }
 
-    /// Folded away, never hidden: telling someone nothing is on 5000 when
-    /// AirPlay is would be worse than the clutter.
-    private func disclosure(
+    /// A tier heading, in the same language as a project heading.
+    ///
+    /// These were sentences — "7 applications" — in a row at the foot of the
+    /// panel, which read as footnotes rather than as structure. Tabs were the
+    /// other candidate and lose on search: typing 5000 has to find AirPlay
+    /// wherever it lives, and a tab bar either contradicts itself or switches
+    /// under you. A heading keeps the count visible, keeps search coherent,
+    /// and matches how menus organise themselves.
+    private func tierHeading(
         for prominence: ListenerPresentation.Prominence,
         title: String,
         help: String
@@ -391,7 +395,7 @@ public struct MenuContent: View {
         let count = rows(prominence).count
         let shown = reveals(prominence)
         return Button {
-            withAnimation(.snappy(duration: 0.15)) {
+            withAnimation(.snappy(duration: 0.18)) {
                 if expanded.contains(prominence) {
                     expanded.remove(prominence)
                 } else {
@@ -399,24 +403,32 @@ public struct MenuContent: View {
                 }
             }
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: shown ? "chevron.down" : "chevron.right")
+            HStack(spacing: 5) {
+                Image(systemName: "chevron.right")
                     .font(.caption2)
-                Text(shown ? "Hide \(title)s" : "\(count) \(title)\(count == 1 ? "" : "s")")
-                Spacer()
+                    .rotationEffect(.degrees(shown ? 90 : 0))
+                    .foregroundStyle(.tertiary)
+                Text(title)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                Spacer(minLength: 0)
+                Text("\(count)")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .monospacedDigit()
             }
-            .font(.caption)
             .foregroundStyle(.secondary)
             .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.top, 8)
+            .padding(.bottom, 3)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help(help)
-        .accessibilityLabel(shown ? "Hide \(title)s" : "Show \(count) \(title)s")
+        .accessibilityLabel("\(title), \(count) listeners")
+        .accessibilityHint(shown ? "Collapse" : "Expand")
         .accessibilityAddTraits(.isButton)
     }
-
     @ViewBuilder
     private var emptyState: some View {
         Text(emptyMessage)
