@@ -21,11 +21,13 @@ public struct MenuContent: View {
     public init(
         store: ListenerStore = ListenerStore(),
         scans: Bool = true,
-        maximumListHeight: CGFloat = 520
+        maximumListHeight: CGFloat = 520,
+        initialSelection: Listener.ID? = nil
     ) {
         _store = State(initialValue: store)
         self.scans = scans
         self.maximumListHeight = maximumListHeight
+        _selection = State(initialValue: initialSelection)
     }
 
     /// One confirmation path, so quitting one process and quitting a project
@@ -110,6 +112,7 @@ public struct MenuContent: View {
             footer
         }
         .frame(width: 340)
+        .background(VisualEffectBackground())
         // Keyboard-first: move with the arrows, act with Return, without ever
         // leaving the search field.
         .onKeyPress(.upArrow) { move(by: -1); return .handled }
@@ -289,7 +292,13 @@ public struct MenuContent: View {
                 .accessibilityLabel("Clear search")
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(.quaternary.opacity(0.6))
+        )
+        .padding(.horizontal, 10)
         .padding(.bottom, 8)
         // Keyboard-first: the panel opens ready to be typed into.
         .onAppear { searchFocused = true }
@@ -312,7 +321,8 @@ public struct MenuContent: View {
     private func takenAnswer(_ row: ListenerPresentation) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 7) {
-                Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange)
+                Image(systemName: "exclamationmark.circle.fill")
+                    .foregroundStyle(Color(nsColor: .systemOrange))
                 Text("\(row.listener.port) is taken by \(row.label ?? row.listener.process.name)")
                     .fontWeight(.medium)
                     .lineLimit(1)
@@ -390,7 +400,7 @@ public struct MenuContent: View {
     private var degradedBanner: some View {
         HStack(alignment: .top, spacing: 7) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
+                .foregroundStyle(Color(nsColor: .systemOrange))
             VStack(alignment: .leading, spacing: 2) {
                 Text(degradedHeadline).font(.caption).fontWeight(.medium)
                 Text(degradedDetail).font(.caption2).foregroundStyle(.secondary)
@@ -399,7 +409,7 @@ public struct MenuContent: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(.orange.opacity(0.1))
+        .background(Color(nsColor: .systemOrange).opacity(0.12))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(degradedHeadline). \(degradedDetail)")
     }
@@ -424,7 +434,8 @@ public struct MenuContent: View {
 
     private func actionErrorBanner(_ message: String) -> some View {
         HStack(spacing: 7) {
-            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(Color(nsColor: .systemOrange))
             Text(message).font(.caption).lineLimit(2)
             Spacer(minLength: 0)
             Button {
@@ -437,31 +448,34 @@ public struct MenuContent: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
-        .background(.orange.opacity(0.1))
+        .background(Color(nsColor: .systemOrange).opacity(0.12))
     }
 
     private var footer: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if !store.oracle.isTrustworthy { oracleFooter }
+            MenuActionRow(title: "Quit Localhost", symbol: "power") {
+                NSApplication.shared.terminate(nil)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var oracleFooter: some View {
         HStack(spacing: 8) {
             // Surfaced rather than logged: if the private-struct parse ever
             // stops agreeing with libproc, the rows are still real but
             // listeners we do not own may be missing or unnamed.
-            if !store.oracle.isTrustworthy {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
-                    .help(oracleExplanation)
-                Text("Limited results")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            Button("Quit") { NSApplication.shared.terminate(nil) }
-                .buttonStyle(.borderless)
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(Color(nsColor: .systemOrange))
+                .help(oracleExplanation)
+            Text("Limited results")
                 .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 7)
+        .padding(.vertical, 5)
     }
 
     private var oracleExplanation: String {

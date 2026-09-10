@@ -254,3 +254,56 @@ which needs a background daemon and fails product principle 9.
   OrbStack has been exercised against a live daemon, and only with no
   containers running. The port-to-container mapping is therefore proven by
   fixture, not by observation.
+
+## Looking like a first-party app
+
+Grounded in the current Human Interface Guidelines rather than recollection.
+The guidance that decided the most here: **Liquid Glass belongs to the
+functional layer — controls and navigation floating above content — and not to
+the content layer.** This panel is mostly content: a list of text. The HIG asks
+for a standard material with vibrant system colours on top for exactly this
+case, "components with a significant amount of text, such as alerts, sidebars,
+or popovers".
+
+So the panel uses `NSVisualEffectView` with the `.menu` material and
+`.behindWindow` blending — the material the system's own menu bar extras use,
+blending with the desktop rather than with the app. That single change is most
+of what separated this from a white rectangle. It also handles Reduce
+Transparency and Increase Contrast on its own, which hand-rolled translucency
+would not.
+
+Everything else follows from "use system components and semantic colours":
+
+- Tabular figures in the system face rather than SF Mono. The port column still
+  aligns, but the panel reads as a menu instead of a code editor.
+- Regular weight throughout, as menus use. Hierarchy comes from the dimmer,
+  smaller second line, not from bolding the first.
+- `selectedContentBackgroundColor` for the highlight, inset from the panel edge
+  the way `NSMenu` insets its rows, with *every* piece of text on the row
+  turning light. Leaving the second line `.secondary` puts grey on selection
+  blue, which fails contrast and looks unfinished.
+- `NSColor.systemOrange` rather than `Color.orange`, so warnings stay correct
+  in dark mode and under Increase Contrast.
+- Actions are full-width rows that highlight edge to edge, like "Wi-Fi
+  Settings…" at the foot of the Wi-Fi menu. A right-aligned push button reads
+  as a dialog control.
+
+### Seeing what AppKit actually draws
+
+`ImageRenderer` draws the SwiftUI view tree with no window behind it, so it
+cannot show a material, a vibrancy effect or a real selection highlight —
+precisely the things that decide whether this looks like a system menu. It was
+reporting a white panel that did not exist.
+
+`Localhost --window [dark]` therefore opens the same content in a real
+borderless `NSPanel` and prints its window number, and `Scripts/shoot-panel.sh`
+captures **that window by id** — this app's window, never the screen. Both
+appearances can be checked in a couple of seconds.
+
+### macOS 27
+
+Not targeted, and not targetable here: this machine runs macOS 26.6.2 and only
+the macOS 26 SDKs are installed. Anything written against macOS 27 APIs could
+be neither compiled nor tested, so it would be guesswork. The work above is
+current-HIG and uses semantic materials and colours throughout, which is what
+carries forward.

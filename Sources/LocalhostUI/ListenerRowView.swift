@@ -21,6 +21,15 @@ public struct ListenerRowView: View {
         self.onAction = onAction
     }
 
+    /// On a highlighted row every piece of text turns light, the way a system
+    /// menu does it. Leaving the second line `.secondary` puts grey on the
+    /// selection blue, which fails contrast and looks unfinished.
+    private var secondaryStyle: AnyShapeStyle {
+        isSelected
+            ? AnyShapeStyle(Color(nsColor: .alternateSelectedControlTextColor).opacity(0.8))
+            : AnyShapeStyle(.secondary)
+    }
+
     /// The first line: what this row is, without repeating its heading.
     private var primary: String {
         if inGroup { return row.runtime?.description ?? process.name }
@@ -32,21 +41,31 @@ public struct ListenerRowView: View {
     public var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(String(row.listener.port))
-                .font(.system(.body, design: .monospaced))
+                // Tabular figures in the system face, not SF Mono: the columns
+                // still align, but the panel reads as a system menu rather
+                // than as a code editor.
+                .font(.body.monospacedDigit())
                 .fontWeight(.medium)
                 .frame(width: 56, alignment: .trailing)
-                .foregroundStyle(process.isOurs ? .primary : .secondary)
+                .foregroundStyle(process.isOurs
+                    ? (isSelected
+                        ? AnyShapeStyle(Color(nsColor: .alternateSelectedControlTextColor))
+                        : AnyShapeStyle(.primary))
+                    : secondaryStyle)
 
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 5) {
                     Text(primary)
-                        .fontWeight(row.label == nil && !inGroup ? .regular : .medium)
+                        // Regular weight throughout, as system menus use.
+                        // Hierarchy comes from the dimmer, smaller second line
+                        // rather than from bolding the first.
+                        .fontWeight(.regular)
                         .lineLimit(1)
                         .truncationMode(.middle)
 
                     if let branch = row.branch, !inGroup {
                         Text(branch)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(secondaryStyle)
                             .lineLimit(1)
                             .truncationMode(.middle)
                     }
@@ -54,7 +73,12 @@ public struct ListenerRowView: View {
                     if row.isExposedDevServer {
                         Image(systemName: "dot.radiowaves.left.and.right")
                             .font(.caption2)
-                            .foregroundStyle(.orange)
+                            // The system orange, so it stays correct in dark
+                            // mode and under Increase Contrast — but on the
+                            // selection fill it becomes light like everything else.
+                            .foregroundStyle(isSelected
+                                ? AnyShapeStyle(Color(nsColor: .alternateSelectedControlTextColor))
+                                : AnyShapeStyle(Color(nsColor: .systemOrange)))
                             .help("Bound to all interfaces — reachable from your network")
                     }
                 }
@@ -62,7 +86,7 @@ public struct ListenerRowView: View {
                 if let secondary {
                     Text(secondary)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(secondaryStyle)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
@@ -70,13 +94,16 @@ public struct ListenerRowView: View {
 
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 3)
+        .padding(.vertical, 4)
         .padding(.horizontal, 12)
         .background(
+            // The highlight menus actually use, inset from the panel edge the
+            // way NSMenu insets its own rows.
             RoundedRectangle(cornerRadius: 5)
-                .fill(isSelected ? Color.accentColor.opacity(0.16) : .clear)
-                .padding(.horizontal, 6)
+                .fill(isSelected ? Color(nsColor: .selectedContentBackgroundColor) : .clear)
+                .padding(.horizontal, 5)
         )
+        .foregroundStyle(isSelected ? AnyShapeStyle(Color(nsColor: .alternateSelectedControlTextColor)) : AnyShapeStyle(.primary))
         .contentShape(Rectangle())
         .onTapGesture {
             if row.supports(.openInBrowser) { onAction(.openInBrowser) }

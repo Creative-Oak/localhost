@@ -20,6 +20,11 @@ enum Main {
             Diagnostics.renderPanel(to: CommandLine.arguments[index + 1])
             return
         }
+        // `--window [dark]` opens the panel as a real window for screenshotting.
+        if CommandLine.arguments.contains("--window") {
+            PanelWindow.show(dark: CommandLine.arguments.contains("dark"))
+            return
+        }
         LocalhostApp.main()
     }
 }
