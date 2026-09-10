@@ -3,6 +3,7 @@ import SwiftUI
 
 public struct MenuContent: View {
     @State private var store: ListenerStore
+    @State private var licenses = LicenseStore()
     /// Height of the row list, measured rather than assumed.
     @State private var contentHeight: CGFloat = 0
     @State private var expanded: Set<ListenerPresentation.Prominence> = []
@@ -91,6 +92,10 @@ public struct MenuContent: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             search
+
+            if licenses.entitlement == .expired {
+                expiredBanner
+            }
 
             if !store.oracle.isTrustworthy, store.hasScanned {
                 degradedBanner
@@ -209,7 +214,13 @@ public struct MenuContent: View {
         VStack(alignment: .leading, spacing: Metrics.rowSpacing) {
             ForEach(sections) { section in
                 if section.project != nil {
-                    SectionHeaderView(section: section) { pending = .project(section) }
+                    SectionHeaderView(section: section) {
+                        guard licenses.entitlement.canAct else {
+                            AppServices.promptForLicense(into: licenses)
+                            return
+                        }
+                        pending = .project(section)
+                    }
                 }
                 ForEach(section.rows) { row in
                     ListenerRowView(
@@ -256,6 +267,11 @@ public struct MenuContent: View {
     private func perform(_ action: ListenerAction, on row: ListenerPresentation) {
         selection = row.id
         guard action != .terminate else {
+            // Discovery is never gated; changing the machine is.
+            guard licenses.entitlement.canAct else {
+                AppServices.promptForLicense(into: licenses)
+                return
+            }
             // The only irreversible action, so it never happens on one click.
             pending = .one(row)
             return
@@ -264,6 +280,7 @@ public struct MenuContent: View {
     }
 
     private func confirm(using signal: ProcessTerminator.Signal) {
+        guard licenses.entitlement.canAct else { return }
         guard let rows = pending?.rows, !rows.isEmpty else { return }
         pending = nil
         Task { await store.terminate(rows, using: signal) }
@@ -304,10 +321,59 @@ public struct MenuContent: View {
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
+            settingsMenu
         }
         .padding(.horizontal, 12)
         .padding(.top, 10)
         .padding(.bottom, 6)
+    }
+
+    /// Everything that is not about ports lives here, so the panel stays a
+    /// list rather than growing a settings screen.
+    private var settingsMenu: some View {
+        Menu {
+            Text(licenses.statusDescription)
+            if !licenses.entitlement.isLicensed {
+                Button("Enter Licence Key…") { AppServices.promptForLicense(into: licenses) }
+            }
+            Divider()
+            Toggle("Open at Login", isOn: Binding(
+                get: { AppServices.opensAtLogin },
+                set: { AppServices.opensAtLogin = $0 }))
+            Divider()
+            Button("About Localhost") { AppServices.showAbout() }
+            Button("Contact Support…") { AppServices.contactSupport() }
+        } label: {
+            Image(systemName: "gearshape")
+                .font(.caption)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .frame(width: 20)
+        .accessibilityLabel("Settings")
+    }
+
+    /// Shown only once the trial is over. Discovery keeps working, so this
+    /// explains what stopped rather than blocking the list.
+    private var expiredBanner: some View {
+        HStack(spacing: 7) {
+            Image(systemName: "clock.badge.exclamationmark")
+                .foregroundStyle(Color(nsColor: .systemOrange))
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Trial ended").font(.caption).fontWeight(.medium)
+                Text("Ports are still listed. Quitting a process needs a licence.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+            Button("Enter Key") { AppServices.promptForLicense(into: licenses) }
+                .controlSize(.small)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(nsColor: .systemOrange).opacity(0.12))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Trial ended. Ports are still listed; quitting a process needs a licence.")
     }
 
     private var search: some View {

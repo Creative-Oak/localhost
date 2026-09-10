@@ -1,3 +1,4 @@
+import AppKit
 import LocalhostKit
 import LocalhostUI
 import SwiftUI
@@ -41,7 +42,17 @@ enum Main {
     }
 }
 
+/// Exists for the one thing that has to happen at launch rather than when the
+/// panel opens: noticing that the last run ended in a crash.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        AppServices.offerPendingCrashReport()
+    }
+}
+
 struct LocalhostApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
+
     var body: some Scene {
         // `.window`, not the default menu style, because this needs a scroll
         // view now and a search field shortly, and NSMenu does neither well.
