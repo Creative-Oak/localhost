@@ -14,9 +14,13 @@ public final class ListenerStore {
     public private(set) var oracle: OracleStatus = .verified(matched: 0)
     public private(set) var lastScanDuration: Duration?
     public private(set) var hasScanned = false
+    /// Set when an action failed, so the panel can say so rather than appearing
+    /// to have done nothing.
+    public private(set) var actionError: String?
 
     private let scanner: ListenerScanner
     private let attributor: ListenerAttributor
+    private let terminator = ProcessTerminator()
 
     public init(scanner: ListenerScanner = ListenerScanner(),
          attributor: ListenerAttributor = ListenerAttributor()) {
@@ -49,6 +53,32 @@ public final class ListenerStore {
         oracle = scanned.oracle
         lastScanDuration = scanned.duration
         hasScanned = true
+    }
+
+    /// Signals a process, then rescans so the row reflects reality.
+    ///
+    /// The terminator re-verifies `(pid, startedAt)` immediately before
+    /// signalling and refuses if the process behind that pid has changed, so a
+    /// row that has gone stale between the scan and the click cannot take an
+    /// innocent process with it.
+    public func terminate(
+        _ row: ListenerPresentation,
+        using signal: ProcessTerminator.Signal = .terminate
+    ) async {
+        do {
+            try terminator.terminate(row.listener.process, using: signal)
+            actionError = nil
+        } catch let failure as ProcessTerminator.Failure {
+            // "Already exited" is the outcome the user wanted, not an error.
+            actionError = failure == .alreadyExited ? nil : failure.description
+        } catch {
+            actionError = error.localizedDescription
+        }
+        await refresh()
+    }
+
+    public func dismissActionError() {
+        actionError = nil
     }
 
     /// Refresh until the caller is cancelled — which happens when the menu closes.

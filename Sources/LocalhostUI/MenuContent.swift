@@ -7,6 +7,8 @@ public struct MenuContent: View {
     @State private var contentHeight: CGFloat = 0
     @State private var showsBackground = false
     @State private var query = ""
+    @State private var selection: Listener.ID?
+    @State private var pendingTermination: ListenerPresentation?
     @FocusState private var searchFocused: Bool
     /// Drives refreshes only when the panel is really on screen; the renderer
     /// seeds its own data and must not start a scan loop.
@@ -42,10 +44,40 @@ public struct MenuContent: View {
                 backgroundDisclosure
             }
 
+            if let message = store.actionError {
+                actionError(message)
+            }
+
             Divider()
             footer
         }
         .frame(width: 340)
+        // Keyboard-first: move with the arrows, act with Return, without ever
+        // leaving the search field.
+        .onKeyPress(.upArrow) { move(by: -1); return .handled }
+        .onKeyPress(.downArrow) { move(by: 1); return .handled }
+        .onKeyPress(.return) { openSelected() }
+        .confirmationDialog(
+            pendingTermination.map { "Quit \($0.terminationDescription)?" } ?? "",
+            isPresented: Binding(
+                get: { pendingTermination != nil },
+                set: { if !$0 { pendingTermination = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button("Quit Process", role: .destructive) {
+                guard let row = pendingTermination else { return }
+                pendingTermination = nil
+                Task { await store.terminate(row, using: .terminate) }
+            }
+            Button("Force Quit", role: .destructive) {
+                guard let row = pendingTermination else { return }
+                pendingTermination = nil
+                Task { await store.terminate(row, using: .force) }
+            }
+            Button("Cancel", role: .cancel) { pendingTermination = nil }
+        } message: {
+            Text("Quit asks it to stop and lets it shut down cleanly. Force quit does not.")
+        }
         // Scanning is tied to the lifetime of this view, so it runs while the
         // menu is open and stops the moment it closes. No background polling.
         .task { if scans { await store.refreshUntilCancelled() } }
@@ -83,6 +115,63 @@ public struct MenuContent: View {
         ListenerSearch.freePort(in: query, rows: store.rows)
     }
 
+    /// Everything on screen, in the order the arrow keys should walk it.
+    private var visible: [ListenerPresentation] {
+        showsBackground ? listed + background : listed
+    }
+
+    private func perform(_ action: ListenerAction, on row: ListenerPresentation) {
+        selection = row.id
+        guard action != .terminate else {
+            // The only irreversible action, so it never happens on one click.
+            pendingTermination = row
+            return
+        }
+        ActionRunner.perform(action, on: row)
+    }
+
+    private func move(by offset: Int) {
+        let rows = visible
+        guard !rows.isEmpty else { return }
+        guard let current = selection, let index = rows.firstIndex(where: { $0.id == current }) else {
+            selection = rows.first?.id
+            return
+        }
+        let next = min(max(index + offset, 0), rows.count - 1)
+        selection = rows[next].id
+    }
+
+    private func openSelected() -> KeyPress.Result {
+        // With a port typed and nothing holding it, Return has nothing to open.
+        guard let selection, let row = visible.first(where: { $0.id == selection }) else {
+            guard let first = visible.first else { return .ignored }
+            self.selection = first.id
+            perform(.openInBrowser, on: first)
+            return .handled
+        }
+        guard row.supports(.openInBrowser) else { return .ignored }
+        perform(.openInBrowser, on: row)
+        return .handled
+    }
+
+    private func actionError(_ message: String) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            Text(message).font(.caption).lineLimit(2)
+            Spacer(minLength: 0)
+            Button {
+                store.dismissActionError()
+            } label: {
+                Image(systemName: "xmark").font(.caption2)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(.orange.opacity(0.1))
+    }
+
     private var search: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
@@ -110,12 +199,9 @@ public struct MenuContent: View {
 
     private var measuredRows: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(listed) { row in
-                ListenerRowView(row: row)
-            }
-            if showsBackground {
-                ForEach(background) { row in
-                    ListenerRowView(row: row)
+            ForEach(visible) { row in
+                ListenerRowView(row: row, isSelected: row.id == selection) { action in
+                    perform(action, on: row)
                 }
             }
         }

@@ -3,8 +3,18 @@ import SwiftUI
 
 public struct ListenerRowView: View {
     let row: ListenerPresentation
+    var isSelected: Bool = false
+    var onAction: (ListenerAction) -> Void = { _ in }
 
-    public init(row: ListenerPresentation) { self.row = row }
+    public init(
+        row: ListenerPresentation,
+        isSelected: Bool = false,
+        onAction: @escaping (ListenerAction) -> Void = { _ in }
+    ) {
+        self.row = row
+        self.isSelected = isSelected
+        self.onAction = onAction
+    }
 
     private var process: ProcessIdentity { row.listener.process }
 
@@ -51,7 +61,24 @@ public struct ListenerRowView: View {
         }
         .padding(.vertical, 3)
         .padding(.horizontal, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 5)
+                .fill(isSelected ? Color.accentColor.opacity(0.16) : .clear)
+                .padding(.horizontal, 6)
+        )
         .contentShape(Rectangle())
+        .onTapGesture {
+            if row.supports(.openInBrowser) { onAction(.openInBrowser) }
+        }
+        .contextMenu {
+            ForEach(row.availableActions, id: \.self) { action in
+                Button {
+                    onAction(action)
+                } label: {
+                    Label(action.title, systemImage: action.symbol)
+                }
+            }
+        }
         .help(tooltip)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)

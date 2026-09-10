@@ -8,9 +8,15 @@ are in [docs/spike-findings.md](docs/spike-findings.md).
 
 ## Status
 
-Step 2 of the plan: a walking skeleton. It lists every TCP listener with its
-process and project, and **it cannot act on anything** — no kill, no open, no
-copy. Those arrive in step 3, deliberately after a week of daily use.
+Step 3 of the plan. It lists every TCP listener with its process, project,
+branch and runtime, and can open, copy, reveal and quit.
+
+Quitting a process is the only irreversible thing here, so it is the most
+guarded: `(pid, startedAt)` is re-read immediately before the signal and the
+terminator refuses if the process behind that pid has changed. A stale row
+cannot take an innocent process with it. `LocalhostKit` scanners have no code
+path that can signal anything; `ProcessTerminator` re-reads one process by pid
+and cannot find a listener.
 
 ## Build
 
