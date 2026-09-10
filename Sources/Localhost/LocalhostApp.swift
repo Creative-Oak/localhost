@@ -32,7 +32,9 @@ enum Main {
         }
         // `--window [dark]` opens the panel as a real window for screenshotting.
         if CommandLine.arguments.contains("--window") {
-            PanelWindow.show(dark: CommandLine.arguments.contains("dark"))
+            PanelWindow.show(
+                dark: CommandLine.arguments.contains("dark"),
+                expandAll: CommandLine.arguments.contains("all"))
             return
         }
         LocalhostApp.main()

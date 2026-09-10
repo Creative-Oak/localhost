@@ -23,12 +23,14 @@ public struct MenuContent: View {
         scans: Bool = true,
         maximumListHeight: CGFloat = 520,
         initialSelection: Listener.ID? = nil,
-        highlightFooter: Bool = false
+        highlightFooter: Bool = false,
+        initiallyExpanded: Set<ListenerPresentation.Prominence> = []
     ) {
         _store = State(initialValue: store)
         self.scans = scans
         self.maximumListHeight = maximumListHeight
         _selection = State(initialValue: initialSelection)
+        _expanded = State(initialValue: initiallyExpanded)
         self.highlightFooter = highlightFooter
     }
 

@@ -8,6 +8,9 @@ import Foundation
 public enum ListenerAction: Hashable, Sendable, CaseIterable {
     case openInBrowser
     case copyURL
+    /// For a listener that is not a web server, where a URL would be a lie but
+    /// the number is still worth having.
+    case copyPort
     case revealInFinder
     case terminate
 
@@ -15,6 +18,7 @@ public enum ListenerAction: Hashable, Sendable, CaseIterable {
         switch self {
         case .openInBrowser: return "Open in Browser"
         case .copyURL: return "Copy URL"
+        case .copyPort: return "Copy Port Number"
         case .revealInFinder: return "Reveal in Finder"
         case .terminate: return "Quit Process…"
         }
@@ -24,6 +28,7 @@ public enum ListenerAction: Hashable, Sendable, CaseIterable {
         switch self {
         case .openInBrowser: return "safari"
         case .copyURL: return "doc.on.doc"
+        case .copyPort: return "number"
         case .revealInFinder: return "folder"
         case .terminate: return "xmark.circle"
         }
@@ -31,6 +36,43 @@ public enum ListenerAction: Hashable, Sendable, CaseIterable {
 }
 
 extension ListenerPresentation {
+    /// Whether opening this in a browser could possibly work.
+    ///
+    /// Offering it everywhere was a promise the row could not keep: clicking
+    /// OneDrive on 42050 opens a tab that fails to connect. Two separate
+    /// reasons disqualify a row.
+    ///
+    /// A listener you did not run to serve a site — an application of yours, or
+    /// a piece of the operating system — is not a web page, whatever port it
+    /// happens to hold.
+    ///
+    /// And a database is not a web page either, even when it *is* yours: a
+    /// Postgres container is a dev server by every other measure, and
+    /// `http://localhost:5432` is still a protocol error.
+    public var servesHTTP: Bool {
+        guard prominence == .devServer else { return false }
+        if let runtime, Self.nonHTTPRuntimes.contains(runtime.name) { return false }
+        return !Self.nonHTTPPorts.contains(listener.port)
+    }
+
+    /// Wire protocols that speak anything but HTTP. Elasticsearch and RabbitMQ's
+    /// management port are deliberately absent — those really are browsable.
+    private static let nonHTTPRuntimes: Set<String> = [
+        "PostgreSQL", "MySQL", "Redis", "MongoDB", "Memcached",
+    ]
+
+    private static let nonHTTPPorts: Set<UInt16> = [
+        5432, 5433,      // PostgreSQL
+        3306, 33060,     // MySQL
+        6379,            // Redis
+        27017, 27018,    // MongoDB
+        11211,           // Memcached
+        1433,            // SQL Server
+        5672,            // AMQP — 15672 is the management UI and is browsable
+        9092,            // Kafka
+        2181,            // ZooKeeper
+    ]
+
     /// `localhost` rather than the bound address: a server on `0.0.0.0` is not
     /// reachable at `http://0.0.0.0/`, and `::` is worse.
     public var localURL: URL? {
@@ -51,7 +93,10 @@ extension ListenerPresentation {
 
     public func supports(_ action: ListenerAction) -> Bool {
         switch action {
-        case .openInBrowser, .copyURL: return localURL != nil
+        case .openInBrowser, .copyURL: return servesHTTP && localURL != nil
+        // The port number is useful for anything — it is what you paste into a
+        // database client, or into a search here.
+        case .copyPort: return !servesHTTP
         case .revealInFinder: return folderToReveal != nil
         case .terminate: return canTerminate
         }

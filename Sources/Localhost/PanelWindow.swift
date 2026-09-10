@@ -13,7 +13,7 @@ import SwiftUI
 /// else on the screen.
 @MainActor
 enum PanelWindow {
-    static func show(dark: Bool) {
+    static func show(dark: Bool, expandAll: Bool = false) {
         let application = NSApplication.shared
         application.setActivationPolicy(.accessory)
 
@@ -23,7 +23,7 @@ enum PanelWindow {
             oracle: result.oracle)
 
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 340, height: 600),
+            contentRect: NSRect(x: 0, y: 0, width: 340, height: expandAll ? 900 : 600),
             // Borderless, because the real menu bar panel has no title bar and
             // a screenshot with one would flatter the layout dishonestly.
             styleMask: [.borderless, .nonactivatingPanel],
@@ -48,8 +48,11 @@ enum PanelWindow {
         let hosting = NSHostingView(rootView: MenuContent(
             store: store,
             scans: false,
-            initialSelection: store.rows.first(where: { $0.prominence == .devServer })?.id,
-            highlightFooter: true))
+            initialSelection: store.rows.first(where: {
+                expandAll ? $0.prominence == .system : $0.prominence == .devServer
+            })?.id,
+            highlightFooter: !expandAll,
+            initiallyExpanded: expandAll ? [.application, .system] : []))
         hosting.frame = panel.contentRect(forFrameRect: panel.frame)
         hosting.autoresizingMask = [.width, .height]
         panel.contentView = hosting

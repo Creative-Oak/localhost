@@ -236,3 +236,90 @@ struct ListenerActionTests {
         #expect(description.contains("3000"))
     }
 }
+
+@Suite("Opening in a browser")
+struct BrowsableTests {
+    private func row(
+        port: UInt16,
+        project: String? = "campo",
+        runtime: String? = "Next.js",
+        executable: String? = nil,
+        ours: Bool = true
+    ) -> ListenerPresentation {
+        ListenerPresentation(
+            listener: Listener(
+                port: port,
+                addresses: ["127.0.0.1"],
+                families: [.ipv4],
+                process: ProcessIdentity(
+                    pid: 1,
+                    startedAt: ours ? 1 : nil,
+                    uid: ours ? getuid() : 0,
+                    name: "node",
+                    executablePath: executable,
+                    workingDirectory: "/tmp")),
+            attribution: project.map {
+                .project(name: $0, root: URL(fileURLWithPath: "/tmp"), source: .packageJSON)
+            } ?? .nothing,
+            runtime: runtime.map { Runtime(name: $0) })
+    }
+
+    @Test("a dev server is browsable")
+    func devServerIsBrowsable() {
+        let server = row(port: 3000)
+        #expect(server.servesHTTP)
+        #expect(server.supports(.openInBrowser))
+        #expect(!server.supports(.copyPort), "a URL is the more useful thing here")
+    }
+
+    @Test("an application of yours is not")
+    func applicationIsNotBrowsable() {
+        // Clicking OneDrive on 42050 opened a tab that failed to connect.
+        let sync = row(port: 42050, project: nil, runtime: nil,
+                       executable: "/Applications/OneDrive.app/Contents/MacOS/OneDrive")
+        #expect(sync.prominence == .application)
+        #expect(!sync.servesHTTP)
+        #expect(!sync.supports(.openInBrowser))
+        #expect(!sync.supports(.copyURL))
+    }
+
+    @Test("a system daemon is not")
+    func systemIsNotBrowsable() {
+        let daemon = row(port: 5900, project: nil, runtime: nil, ours: false)
+        #expect(!daemon.servesHTTP)
+        #expect(!daemon.supports(.openInBrowser))
+    }
+
+    @Test("a database is not, even when it is yours", arguments: [
+        5432, 3306, 6379, 27017, 11211,
+    ] as [UInt16])
+    func databasePortIsNotBrowsable(port: UInt16) {
+        // A Postgres container is a dev server by every other measure, and
+        // http://localhost:5432 is still a protocol error.
+        let database = row(port: port, runtime: nil)
+        #expect(database.prominence == .devServer)
+        #expect(!database.servesHTTP)
+        #expect(database.supports(.copyPort))
+    }
+
+    @Test("a database is disqualified by its runtime as well as its port")
+    func databaseRuntimeIsNotBrowsable() {
+        // Postgres moved off 5432 is still Postgres.
+        let database = row(port: 6000, runtime: "PostgreSQL")
+        #expect(!database.servesHTTP)
+    }
+
+    @Test("something browsable on an unusual port stays browsable")
+    func unusualHTTPPortIsBrowsable() {
+        #expect(row(port: 4321, runtime: "Vite").servesHTTP)
+    }
+
+    @Test("every row offers exactly one way to copy")
+    func exactlyOneCopyAction() {
+        for row in [row(port: 3000), row(port: 5432, runtime: nil),
+                    row(port: 42050, project: nil, runtime: nil, ours: false)] {
+            let copies = row.availableActions.filter { $0 == .copyURL || $0 == .copyPort }
+            #expect(copies.count == 1, "port \(row.listener.port) offered \(copies)")
+        }
+    }
+}

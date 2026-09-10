@@ -18,6 +18,9 @@ enum ActionRunner {
             guard let url = row.localURL else { return }
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(url.absoluteString, forType: .string)
+        case .copyPort:
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(String(row.listener.port), forType: .string)
         case .revealInFinder:
             guard let folder = row.folderToReveal else { return }
             NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: folder.path)

@@ -331,6 +331,23 @@ own `~/Library` is deliberately *not* a system location, so a helper inside
 Search reaches every tier regardless of the disclosures. Answering "nothing
 matches 5000" while AirPlay sits on it would be the same lie the folding avoids.
 
+### What can be opened
+
+Offering "Open in Browser" on every row was a promise the row could not keep:
+clicking OneDrive on 42050 opens a tab that fails to connect. Two separate
+things disqualify a row, and both are needed.
+
+A listener you did not run to serve a site — an application of yours, or a
+piece of the operating system — is not a web page, whatever port it holds. And
+a database is not a web page even when it *is* yours: a Postgres container is a
+dev server by every other measure, and `http://localhost:5432` is still a
+protocol error. So both the tier and the port (and the runtime, for a database
+moved off its usual port) have to agree.
+
+Rows that cannot be opened offer **Copy Port Number** instead of Copy URL — the
+number is what you paste into a database client. Every row offers exactly one
+way to copy, and that is asserted.
+
 ### Corner geometry
 
 Rows highlight edge to edge, so against a rounded panel a highlight can draw
