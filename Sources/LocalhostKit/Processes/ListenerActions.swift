@@ -11,7 +11,11 @@ public enum ListenerAction: Hashable, Sendable, CaseIterable {
     /// For a listener that is not a web server, where a URL would be a lie but
     /// the number is still worth having.
     case copyPort
+    case openInTerminal
     case revealInFinder
+    /// The command that started this, to paste into a shell. See ``StartCommand``
+    /// for why the app hands this over instead of restarting the process itself.
+    case copyStartCommand
     case terminate
 
     public var title: String {
@@ -19,7 +23,9 @@ public enum ListenerAction: Hashable, Sendable, CaseIterable {
         case .openInBrowser: return "Open in Browser"
         case .copyURL: return "Copy URL"
         case .copyPort: return "Copy Port Number"
+        case .openInTerminal: return "Open in Terminal"
         case .revealInFinder: return "Reveal in Finder"
+        case .copyStartCommand: return "Copy Start Command"
         case .terminate: return "Quit Process…"
         }
     }
@@ -29,7 +35,9 @@ public enum ListenerAction: Hashable, Sendable, CaseIterable {
         case .openInBrowser: return "safari"
         case .copyURL: return "doc.on.doc"
         case .copyPort: return "number"
+        case .openInTerminal: return "terminal"
         case .revealInFinder: return "folder"
+        case .copyStartCommand: return "text.append"
         case .terminate: return "xmark.circle"
         }
     }
@@ -97,7 +105,8 @@ extension ListenerPresentation {
         // The port number is useful for anything — it is what you paste into a
         // database client, or into a search here.
         case .copyPort: return !servesHTTP
-        case .revealInFinder: return folderToReveal != nil
+        case .openInTerminal, .revealInFinder: return folderToReveal != nil
+        case .copyStartCommand: return startCommand != nil
         case .terminate: return canTerminate
         }
     }
@@ -105,6 +114,8 @@ extension ListenerPresentation {
     public var availableActions: [ListenerAction] {
         ListenerAction.allCases.filter(supports)
     }
+
+    public var startCommand: StartCommand? { StartCommand(for: listener.process) }
 
     /// Names the process the way a confirmation should: unambiguously.
     public var terminationDescription: String {

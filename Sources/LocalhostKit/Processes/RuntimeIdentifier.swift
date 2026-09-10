@@ -50,7 +50,28 @@ public enum RuntimeIdentifier {
         ("yarn", "run", "Yarn"),
     ]
 
+    /// Where a compiled language leaves the binary it just built.
+    ///
+    /// `go run` and `cargo run` compile to a temporary or build-directory
+    /// executable and exec *that*, so the process holding the port is neither
+    /// `go` nor `cargo` and argv says nothing useful. The path does.
+    private static let byExecutablePath: [(fragment: String, name: String)] = [
+        ("/go-build", "Go"),              // $TMPDIR/go-build…/exe/<name>
+        ("/target/debug/", "Rust"),       // cargo run
+        ("/target/release/", "Rust"),
+        ("/.build/debug/", "Swift"),      // swift run
+        ("/.build/release/", "Swift"),
+        ("/node_modules/.bin/", "Node"),  // a bare binstub with nothing else to go on
+    ]
+
     public static func runtime(arguments: [String]?, executablePath: String?) -> Runtime? {
+        // Checked first: for a compiled server the path is the only evidence,
+        // and argv would otherwise fall through to nothing.
+        if let executablePath {
+            for entry in byExecutablePath where executablePath.contains(entry.fragment) {
+                return Runtime(name: entry.name)
+            }
+        }
         guard let arguments, !arguments.isEmpty else { return nil }
         let tokens = arguments.map { ($0 as NSString).lastPathComponent }
 

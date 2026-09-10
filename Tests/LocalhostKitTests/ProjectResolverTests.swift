@@ -319,3 +319,44 @@ struct ProminenceTests {
         #expect(rows.first?.prominence == .system)
     }
 }
+
+@Suite("Compiled runtimes")
+struct CompiledRuntimeTests {
+    /// `go run` and `cargo run` exec a freshly built binary, so the process
+    /// holding the port is not the tool that started it. argv is useless here
+    /// and the executable path is the only evidence.
+    @Test("recognises a compiled server by where its binary lives", arguments: [
+        ("/var/folders/xy/T/go-build2734/b001/exe/server", "Go"),
+        ("/Users/x/dev/api/target/debug/api", "Rust"),
+        ("/Users/x/dev/api/target/release/api", "Rust"),
+        ("/Users/x/dev/tool/.build/debug/tool", "Swift"),
+    ])
+    func compiledBinaryIsRecognised(path: String, expected: String) {
+        let runtime = RuntimeIdentifier.runtime(arguments: [path], executablePath: path)
+        #expect(runtime?.name == expected)
+    }
+
+    @Test("an interpreted server is still read from argv")
+    func argvStillWins() {
+        let runtime = RuntimeIdentifier.runtime(
+            arguments: ["next-server (v16.3.4)"],
+            executablePath: "/usr/local/bin/node")
+        #expect(runtime?.name == "Next.js")
+        #expect(runtime?.version == "16.3.4")
+    }
+
+    @Test("a compiled server counts as a dev server")
+    func compiledServerIsADevServer() {
+        // Without the path rule this had no runtime, so it was filed as an
+        // application and folded away.
+        let listener = Listener(
+            port: 8080,
+            addresses: ["127.0.0.1"],
+            families: [.ipv4],
+            process: ProcessIdentity(
+                pid: 1, startedAt: 1, uid: getuid(), name: "api",
+                executablePath: "/Users/x/dev/api/target/debug/api",
+                workingDirectory: "/"))
+        #expect(ListenerAttributor().present([listener]).first?.prominence == .devServer)
+    }
+}

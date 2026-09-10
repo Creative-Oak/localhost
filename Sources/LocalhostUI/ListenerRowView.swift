@@ -27,6 +27,12 @@ public struct ListenerRowView: View {
         self.onAction = onAction
     }
 
+    /// Shown inline on the highlighted row. Quitting is not among them: it is
+    /// irreversible and belongs behind the context menu and a confirmation.
+    private static let quickActions: [ListenerAction] = [
+        .openInBrowser, .openInTerminal, .revealInFinder,
+    ]
+
     /// On a highlighted row every piece of text turns light, the way a system
     /// menu does it. Leaving the second line `.secondary` puts grey on the
     /// selection blue, which fails contrast and looks unfinished.
@@ -100,13 +106,26 @@ public struct ListenerRowView: View {
 
             Spacer(minLength: 0)
 
-            // Nothing previously suggested a row was clickable. This appears
-            // under the pointer and names the outcome, rather than leaving
-            // people to try a click and find out.
-            if isHighlighted, row.supports(.openInBrowser) {
-                Image(systemName: "arrow.up.forward.app")
-                    .font(.caption)
-                    .foregroundStyle(Color(nsColor: .alternateSelectedControlTextColor).opacity(0.85))
+            // Nothing previously suggested a row was clickable, and the
+            // useful destinations — the browser, a terminal, the folder —
+            // were buried in a context menu nobody had reason to try.
+            if isHighlighted {
+                HStack(spacing: 2) {
+                    ForEach(Self.quickActions.filter(row.supports), id: \.self) { action in
+                        Button {
+                            onAction(action)
+                        } label: {
+                            Image(systemName: action.symbol)
+                                .font(.caption)
+                                .frame(width: 20, height: 18)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help(action.title)
+                        .accessibilityLabel(action.title)
+                    }
+                }
+                .foregroundStyle(Color(nsColor: .alternateSelectedControlTextColor).opacity(0.9))
             }
         }
         .padding(.vertical, 4)
@@ -138,6 +157,22 @@ public struct ListenerRowView: View {
                     onAction(action)
                 } label: {
                     Label(action.title, systemImage: action.symbol)
+                }
+                // The submenu doubles as the preference: whichever app is
+                // picked here becomes the default for every row afterwards.
+                if action == .openInBrowser {
+                    Menu("Open in Browser…") {
+                        ForEach(ExternalApps.browsers()) { browser in
+                            Button(browser.name) { ActionRunner.open(row, inBrowser: browser) }
+                        }
+                    }
+                }
+                if action == .openInTerminal {
+                    Menu("Open in Terminal…") {
+                        ForEach(ExternalApps.terminals()) { terminal in
+                            Button(terminal.name) { ActionRunner.open(row, inTerminal: terminal) }
+                        }
+                    }
                 }
             }
         }

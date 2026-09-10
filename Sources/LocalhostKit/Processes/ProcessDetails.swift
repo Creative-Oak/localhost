@@ -76,6 +76,18 @@ public struct ProcessDetails: Sendable {
     }
 
     public static func arguments(of pid: pid_t) -> [String]? {
+        commandLine(of: pid)?.arguments
+    }
+
+    /// Everything `KERN_PROCARGS2` carries: argv *and* the environment.
+    ///
+    /// The environment matters for relaunching. A dev server started with
+    /// `PORT=4000 NODE_ENV=development npm run dev` and restarted without those
+    /// is a different process wearing the same name.
+    ///
+    /// Layout: `argc`, the exec path, null padding, `argc` arguments, then
+    /// environment entries until they run out.
+    public static func commandLine(of pid: pid_t) -> (arguments: [String], environment: [String: String])? {
         var mib = [CTL_KERN, KERN_PROCARGS2, pid]
         var size = argumentMaximum
         var buffer = [UInt8](repeating: 0, count: size)
@@ -100,7 +112,15 @@ public struct ProcessDetails: Sendable {
             guard let argument = next() else { break }
             arguments.append(argument)
         }
-        return arguments.isEmpty ? nil : arguments
+        guard !arguments.isEmpty else { return nil }
+
+        var environment: [String: String] = [:]
+        while let entry = next(), !entry.isEmpty {
+            // Only split on the first `=`; values contain them routinely.
+            guard let separator = entry.firstIndex(of: "=") else { continue }
+            environment[String(entry[..<separator])] = String(entry[entry.index(after: separator)...])
+        }
+        return (arguments, environment)
     }
 
     private static let argumentMaximum: Int = {

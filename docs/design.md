@@ -348,6 +348,35 @@ Rows that cannot be opened offer **Copy Port Number** instead of Copy URL — th
 number is what you paste into a database client. Every row offers exactly one
 way to copy, and that is asserted.
 
+### Why there is no Restart
+
+Restarting a server without asking anyone to store a launch command looked
+possible: the running process already carries its own argv, environment and
+working directory. It does not survive contact with the system. **Current macOS
+no longer returns a process's environment from `KERN_PROCARGS2`** — `ps -E`
+shows nothing either, for your own processes as much as anyone else's, because
+environments routinely carry secrets.
+
+A relaunch could therefore reproduce argv and the working directory and would
+silently drop `PORT=4000 NODE_ENV=development`. A server that comes back on the
+wrong port while reporting success is the same class of failure as killing the
+wrong process, so the app does not offer it.
+
+What it offers instead is **Copy Start Command** and **Open in Terminal**: the
+command, and a shell in the right directory, where the developer's own profile
+supplies the environment. The knowledge is handed over rather than acted on
+with a piece missing. `StartCommandTests` asserts the environment is empty, so
+that if macOS ever exposes it again the test fails and says so.
+
+### Choosing a browser or a terminal
+
+There is no settings window. Picking an app from the "Open in…" submenu is what
+sets the default, so the preference emerges from use rather than from a screen
+nobody would go looking for in a panel this size. macOS has no notion of a
+default terminal, so that list is a known set filtered by what is installed; a
+remembered app that has since been deleted falls back rather than stranding the
+row.
+
 ### Corner geometry
 
 Rows highlight edge to edge, so against a rounded panel a highlight can draw
