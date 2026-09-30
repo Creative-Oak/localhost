@@ -62,8 +62,8 @@ rest. The script never sees the password.
 
 ### 1.4 Confirm the bundle identifier against your team
 
-You approved `com.magnisoft.Localhost`. Check it does not clash with anything
-else on your developer account before the first release — changing it
+The identifier is `dk.creativeoak.Localhost`. Check it does not clash with
+anything else on your developer account before the first release — changing it
 afterwards strands everyone who already installed.
 
 ---
@@ -169,7 +169,7 @@ replace.
 
 ### 5.2 A support address that exists
 
-`support@magnisoft.dk` is a placeholder, marked as one in
+`support@creativeoak.dk` is a placeholder, marked as one in
 `Sources/LocalhostUI/AppServices.swift`. Create the mailbox or change the
 address.
 

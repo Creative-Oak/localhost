@@ -35,7 +35,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.magnisoft.Localhost</string>
+	<string>dk.creativeoak.Localhost</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -47,7 +47,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright © 2026 Magnisoft.</string>
+	<string>Copyright © 2026 Creative Oak.</string>
 </dict>
 </plist>
 PLIST

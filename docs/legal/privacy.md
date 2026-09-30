@@ -4,7 +4,7 @@ _Draft. Have a lawyer read this before publishing. Placeholders in **bold**._
 
 **Last updated: 10 September 2026**
 
-Localhost is a macOS utility published by **[Magnisoft — full legal entity and
+Localhost is a macOS utility published by **[Creative Oak — full legal entity and
 address]**.
 
 ## The short version
@@ -65,7 +65,7 @@ it before sending if that concerns you.
 
 Since no personal data reaches us, there is nothing for us to disclose, correct
 or delete. If you email support, we hold that correspondence — write to
-**support@magnisoft.dk** to have it deleted.
+**support@creativeoak.dk** to have it deleted.
 
 ## Changes
 

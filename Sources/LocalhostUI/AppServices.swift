@@ -8,7 +8,7 @@ import ServiceManagement
 @MainActor
 public enum AppServices {
     /// Placeholder. Replace before release — this address does not exist.
-    static let supportAddress = "support@magnisoft.dk"
+    static let supportAddress = "support@creativeoak.dk"
 
     static var version: String {
         let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
@@ -48,7 +48,7 @@ public enum AppServices {
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationName: "Localhost",
             .applicationVersion: version,
-            .init(rawValue: "Copyright"): "Copyright © 2026 Magnisoft.",
+            .init(rawValue: "Copyright"): "Copyright © 2026 Creative Oak.",
         ])
     }
 

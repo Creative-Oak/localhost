@@ -48,10 +48,9 @@ will reach. It never handles a secret itself.
 
 ## Still open before a first release
 
-- **The bundle identifier is a guess.** `com.magnisoft.Localhost`, inferred
-  from the repository name. It must match the certificate's team and should be
-  settled before anything is distributed, because changing it afterwards
-  strands existing installs.
+- **The bundle identifier** is `dk.creativeoak.Localhost`. It must match the
+  certificate's team, and must not change after the first release — changing it
+  afterwards strands existing installs.
 - **The icon is a placeholder.** `Scripts/make-icon.swift` generates it and
   says so. It should be replaced by a designer's work.
 - **No trial or licensing mechanism exists.** That is a product decision, not

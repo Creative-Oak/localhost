@@ -4,7 +4,7 @@ _Draft. Have a lawyer read this before publishing. Placeholders in **bold**._
 
 **Last updated: 10 September 2026**
 
-This agreement is between you and **[Magnisoft — full legal entity and
+This agreement is between you and **[Creative Oak — full legal entity and
 address]** ("we"), and covers the Localhost application and any updates to it.
 Installing or using Localhost means you accept it.
 
@@ -92,4 +92,4 @@ proceedings locally.
 
 ## 10. Contact
 
-**support@magnisoft.dk**
+**support@creativeoak.dk**

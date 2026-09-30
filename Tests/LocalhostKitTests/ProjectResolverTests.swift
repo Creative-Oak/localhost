@@ -87,7 +87,7 @@ struct ProjectResolverTests {
 
     @Test("go.mod reduces a module path to its last component")
     func goModuleName() throws {
-        let root = try tree(["go.mod": "module github.com/magnisoft/gopher-tool\n\ngo 1.22\n"])
+        let root = try tree(["go.mod": "module github.com/creative-oak/gopher-tool\n\ngo 1.22\n"])
         let project = try #require(resolver.project(for: root.path))
         #expect(project.name == "gopher-tool")
         #expect(project.source == .goModule)
