@@ -4,8 +4,8 @@ _Draft. Have a lawyer read this before publishing. Placeholders in **bold**._
 
 **Last updated: 10 September 2026**
 
-Localhost is a macOS utility published by **[Creative Oak — full legal entity and
-address]**.
+Localhost is a macOS utility published by Creative Oak ApS, **[CVR number and
+registered address]**.
 
 ## The short version
 

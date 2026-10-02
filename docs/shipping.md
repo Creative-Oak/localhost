@@ -1,8 +1,8 @@
 # Shipping
 
-Everything in steps 1–6 is done and verified on this machine. What remains
-needs an Apple Developer Program membership, so it cannot be automated from
-here.
+Everything in steps 1–6 is done and verified on this machine. The Developer
+ID certificate is installed; what remains is storing notarisation credentials
+and the first real release run.
 
 ## What is already proven
 
@@ -20,19 +20,18 @@ sandboxed, hardened runtime, direct distribution, no privileged helper.
 
 ## What you have to do once
 
-1. **Join the Apple Developer Program** ($99/year). There is no Developer ID
-   without it, and no notarisation without a Developer ID.
-2. **Create a Developer ID Application certificate** in the developer portal
-   and install it in the login keychain. Confirm with:
+1. ~~**Join the Apple Developer Program.**~~ Done.
+2. ~~**Create a Developer ID Application certificate.**~~ Done:
+   `Developer ID Application: Creative Oak ApS (493257NQK3)` is in the login
+   keychain. Confirm with:
    ```sh
    security find-identity -v -p codesigning
    ```
-   This machine currently reports `0 valid identities found`.
 3. **Store notarisation credentials** once, in the keychain rather than in the
    environment or a file:
    ```sh
    xcrun notarytool store-credentials localhost-notary \
-     --apple-id you@example.com --team-id TEAMID
+     --apple-id you@example.com --team-id 493257NQK3
    ```
    It will ask for an app-specific password, generated at appleid.apple.com.
 
@@ -48,13 +47,17 @@ will reach. It never handles a secret itself.
 
 ## Still open before a first release
 
+- **The licence signing key is a placeholder.** `License.signingPublicKey`
+  must be replaced with a real public key (see `human-plan.md` §1.1), or every
+  key sold will be rejected.
 - **The bundle identifier** is `dk.creativeoak.Localhost`. It must match the
-  certificate's team, and must not change after the first release — changing it
-  afterwards strands existing installs.
+  certificate's team (493257NQK3), and must not change after the first
+  release — changing it afterwards strands existing installs.
 - **The icon is a placeholder.** `Scripts/make-icon.swift` generates it and
   says so. It should be replaced by a designer's work.
-- **No trial or licensing mechanism exists.** That is a product decision, not
-  an implementation gap, and it interacts with the pricing question below.
+- **Licensing is built, pricing is not decided.** A 14-day trial and offline
+  Ed25519 licence keys are implemented; the price and the store are still
+  open, see below.
 - **No update mechanism.** Direct distribution means either Sparkle or telling
   people to re-download.
 - **The port-to-container mapping is proven by fixture, not observation.** No

@@ -38,15 +38,11 @@ swift Scripts/make-license.swift --sign you@example.com --key <private-base64>
 Then paste that key into the app's gear menu → Enter Licence Key. It should say
 "Licensed to …". If it does, the loop works end to end.
 
-### 1.2 Apple Developer Program
+### 1.2 Apple Developer Program ✅
 
-$99/year. There is no Developer ID without it, and no notarisation without a
-Developer ID. This machine currently reports `0 valid identities found`.
-
-1. Join at developer.apple.com.
-2. Create a **Developer ID Application** certificate and install it in your
-   login keychain.
-3. Confirm: `security find-identity -v -p codesigning`
+Done. `Developer ID Application: Creative Oak ApS (493257NQK3)` is installed in
+the login keychain. Confirm any time with
+`security find-identity -v -p codesigning`.
 
 ### 1.3 Notarisation credentials
 
@@ -54,7 +50,7 @@ Generate an app-specific password at appleid.apple.com, then store it once:
 
 ```sh
 xcrun notarytool store-credentials localhost-notary \
-  --apple-id you@example.com --team-id TEAMID
+  --apple-id you@example.com --team-id 493257NQK3
 ```
 
 After that, `NOTARY_PROFILE=localhost-notary ./Scripts/release.sh` does the
@@ -62,7 +58,8 @@ rest. The script never sees the password.
 
 ### 1.4 Confirm the bundle identifier against your team
 
-The identifier is `dk.creativeoak.Localhost`. Check it does not clash with
+The identifier is `dk.creativeoak.Localhost`, to be registered under team
+493257NQK3. Check it does not clash with
 anything else on your developer account before the first release — changing it
 afterwards strands everyone who already installed.
 
@@ -77,7 +74,8 @@ careful read by you or me.
 
 Bolded in both files:
 
-- Full legal entity name and address.
+- ~~Full legal entity name~~ — filled in as Creative Oak ApS. Still needed:
+  CVR number and registered address.
 - Refund window (14 or 30 days is customary).
 - Governing law and jurisdiction — drafted as Denmark; confirm.
 

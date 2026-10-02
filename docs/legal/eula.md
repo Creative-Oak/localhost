@@ -4,8 +4,8 @@ _Draft. Have a lawyer read this before publishing. Placeholders in **bold**._
 
 **Last updated: 10 September 2026**
 
-This agreement is between you and **[Creative Oak — full legal entity and
-address]** ("we"), and covers the Localhost application and any updates to it.
+This agreement is between you and Creative Oak ApS, **[CVR number and
+registered address]** ("we"), and covers the Localhost application and any updates to it.
 Installing or using Localhost means you accept it.
 
 ## 1. What you may do
