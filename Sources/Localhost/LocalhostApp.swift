@@ -36,7 +36,9 @@ enum Main {
             PanelWindow.show(
                 dark: CommandLine.arguments.contains("dark"),
                 expandAll: CommandLine.arguments.contains("all"),
-                confirmDemo: CommandLine.arguments.contains("confirm"))
+                confirmDemo: CommandLine.arguments.contains("confirm"),
+                sample: CommandLine.arguments.contains("sample"),
+                grow: CommandLine.arguments.contains("grow"))
             return
         }
         LocalhostApp.main()

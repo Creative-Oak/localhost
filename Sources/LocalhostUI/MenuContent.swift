@@ -6,6 +6,9 @@ public struct MenuContent: View {
     /// Height of the row list, measured rather than assumed.
     @State private var contentHeight: CGFloat = 0
     @State private var expanded: Set<ListenerPresentation.Prominence> = []
+    /// A tier just opened, waiting for the list to be re-measured so it can be
+    /// scrolled into view.
+    @State private var revealing: ListenerPresentation.Prominence?
     @State private var query = ""
     @State private var selection: Listener.ID?
     @FocusState private var searchFocused: Bool
@@ -37,6 +40,9 @@ public struct MenuContent: View {
 
     private let highlightFooter: Bool
     private let forceHoverOn: Listener.ID?
+    /// Expands every tier a moment after appearing, so a screenshot can show
+    /// the window growing to fit — the one thing a static render cannot.
+    public var expandsAfterAppearing = false
 
     /// One confirmation path, so quitting one process and quitting a project
     /// cannot drift apart.
@@ -94,13 +100,12 @@ public struct MenuContent: View {
             case let .taken(row):
                 takenAnswer(row)
             case .notAPort:
-                if visible.isEmpty {
+                if hasNothingToShow {
                     emptyState
                 } else {
                     list
                 }
             }
-
 
             if let message = store.actionError {
                 actionErrorBanner(message)
@@ -110,6 +115,9 @@ public struct MenuContent: View {
             footer
         }
         .frame(width: 340)
+        // Always the content's own height, never squeezed to the window's:
+        // the window follows the content, not the other way round.
+        .fixedSize(horizontal: false, vertical: true)
         // Rows highlight edge to edge, so near the panel's rounded corner a
         // highlight would otherwise draw past the window's shape and onto the
         // desktop. Clipping the content — and only the content — keeps
@@ -119,6 +127,7 @@ public struct MenuContent: View {
         // the window is invisible, whereas clipping it wider leaves a gap.
         .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
         .background(VisualEffectBackground())
+        .background(GeometryReader { proxy in WindowFitter(height: proxy.size.height) })
         // Keyboard-first: move with the arrows, act with Return, without ever
         // leaving the search field.
         .onKeyPress(.upArrow) { move(by: -1); return .handled }
@@ -136,6 +145,12 @@ public struct MenuContent: View {
         // menu is open and stops the moment it closes. No background polling.
         .task { if scans { await store.refreshUntilCancelled() } }
         .onAppear { if scans { Updates.checkIfDue() } }
+        .task {
+            guard expandsAfterAppearing else { return }
+            try? await Task.sleep(for: .seconds(0.8))
+            withAnimation(.snappy(duration: 0.18)) { expanded = [.application, .system] }
+            revealing = .system
+        }
     }
 
     // MARK: - Rows
@@ -171,24 +186,68 @@ public struct MenuContent: View {
         yours + foldedTiers.flatMap { reveals($0.prominence) ? rows($0.prominence) : [] }
     }
 
+    /// Nothing in any tier, rather than nothing in the first one. Hiding the
+    /// tier headings whenever no dev server was running left a quiet machine
+    /// with no way to reach its applications or system listeners at all.
+    private var hasNothingToShow: Bool {
+        visible.isEmpty && foldedTiers.allSatisfy { rows($0.prominence).isEmpty }
+    }
+
+    /// The screen decides how tall the list may get, so a long list scrolls
+    /// rather than running off a small display. `.infinity` is left alone: the
+    /// headless renderer asks for every row.
+    private var listLimit: CGFloat {
+        maximumListHeight.isFinite ? min(maximumListHeight, NSScreen.listHeightLimit) : .infinity
+    }
+
     /// A scroll view appears only once the rows genuinely overflow.
     ///
     /// `ScrollView` reports no intrinsic height, so wrapping the list in one
     /// unconditionally collapses the panel to a single row inside
     /// `MenuBarExtra`'s window sizing. The rows are therefore laid out and
     /// measured first, and only wrapped when the measurement says they must be.
-    @ViewBuilder
+    ///
+    /// Once it scrolls, the list follows two things off-screen: a tier that was
+    /// just opened, whose rows would otherwise appear below the fold as if the
+    /// click did nothing, and the selection as the arrow keys move it.
     private var list: some View {
-        if contentHeight > maximumListHeight {
-            ScrollView { measuredRows }
-                .frame(height: maximumListHeight)
-        } else {
-            measuredRows
+        ScrollViewReader { proxy in
+            Group {
+                if contentHeight > listLimit {
+                    ScrollView { measuredRows }
+                        .frame(height: listLimit)
+                } else {
+                    measuredRows
+                }
+            }
+            .onChange(of: contentHeight) {
+                guard let tier = revealing else { return }
+                revealing = nil
+                // A turn later, so a scroll view that has only just appeared
+                // has laid out its content.
+                DispatchQueue.main.async {
+                    withAnimation(.snappy(duration: 0.25)) { proxy.scrollTo(tierAnchor(tier), anchor: .top) }
+                }
+            }
+            .onChange(of: selection) {
+                guard let selection else { return }
+                withAnimation(.snappy(duration: 0.15)) { proxy.scrollTo(selection) }
+            }
         }
+    }
+
+    private func tierAnchor(_ prominence: ListenerPresentation.Prominence) -> String {
+        "tier-\(prominence)"
     }
 
     private var measuredRows: some View {
         VStack(alignment: .leading, spacing: Metrics.rowSpacing) {
+            if yours.isEmpty, query.isEmpty {
+                Text(emptyMessage)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+            }
             ForEach(sections) { section in
                 if section.project != nil {
                     SectionHeaderView(section: section) {
@@ -205,11 +264,13 @@ public struct MenuContent: View {
                         perform(action, on: row)
                     }
                     .padding(.leading, section.project == nil ? 0 : 10)
+                    .id(row.id)
                 }
             }
             ForEach(foldedTiers, id: \.prominence) { tier in
                 if !rows(tier.prominence).isEmpty {
                     tierHeading(for: tier.prominence, title: tier.title, help: tier.help)
+                        .id(tierAnchor(tier.prominence))
                     if reveals(tier.prominence) {
                         ForEach(rows(tier.prominence)) { row in
                             ListenerRowView(
@@ -219,6 +280,7 @@ public struct MenuContent: View {
                             ) { action in
                                 perform(action, on: row)
                             }
+                            .id(row.id)
                         }
                     }
                 }
@@ -423,6 +485,7 @@ public struct MenuContent: View {
                     expanded.remove(prominence)
                 } else {
                     expanded.insert(prominence)
+                    revealing = prominence
                 }
             }
         } label: {
@@ -526,7 +589,6 @@ public struct MenuContent: View {
 
     private var footer: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if !store.oracle.isTrustworthy { oracleFooter }
             MenuActionRow(
                 title: "Quit Localhost",
                 symbol: "power",
@@ -536,31 +598,6 @@ public struct MenuContent: View {
             }
         }
         .padding(.vertical, 4)
-    }
-
-    private var oracleFooter: some View {
-        HStack(spacing: 8) {
-            // Surfaced rather than logged: if the private-struct parse ever
-            // stops agreeing with libproc, the rows are still real but
-            // listeners we do not own may be missing or unnamed.
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(Color(nsColor: .systemOrange))
-                .help(oracleExplanation)
-            Text("Limited results")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer()
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 5)
-    }
-
-    private var oracleExplanation: String {
-        switch store.oracle {
-        case .verified: return ""
-        case let .degraded(reason): return "Showing your own processes only. \(reason)"
-        case let .failed(reason): return "Port discovery failed. \(reason)"
-        }
     }
 }
 

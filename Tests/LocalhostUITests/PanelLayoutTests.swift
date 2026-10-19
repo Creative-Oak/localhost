@@ -74,6 +74,23 @@ struct PanelLayoutTests {
         #expect(clamped.size.height < 460, "clamped panel was \(clamped.size.height)pt")
     }
 
+    @Test("folded tiers stay reachable when no dev server is running")
+    func foldedTiersShowWithoutDevServers() throws {
+        let system = ListenerPresentation(
+            listener: Listener(
+                port: 49152, addresses: ["127.0.0.1"], families: [.ipv4],
+                process: ProcessIdentity(pid: 388, startedAt: nil, uid: 0, name: "rapportd")),
+            attribution: .unavailable)
+        #expect(system.prominence == .system)
+
+        let empty = try #require(render([]))
+        let quiet = try #require(render([system]))
+        // The tier heading is a line of its own. Before, the empty state
+        // replaced the whole list and the two rendered identically.
+        #expect(quiet.size.height > empty.size.height + 10,
+                "no rows: \(empty.size.height)pt, one system row: \(quiet.size.height)pt")
+    }
+
     /// Draws into a bitmap whose layout we control. `tiffRepresentation` can
     /// hand back a planar rep, where `bitmapData` is a single colour plane and
     /// indexing it as interleaved RGBA reads past the end of every row.
