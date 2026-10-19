@@ -139,15 +139,17 @@ store and I will build the issuing endpoint.
 
 ### 4.1 Decide where updates live
 
-I recommend **Sparkle**, driven by the panel opening rather than a background
-timer, so the app keeps its "does nothing while closed" property. You need to
-provide:
+Done: **Sparkle**, checking when the panel opens (at most daily) rather than on
+a timer, so the app keeps its "does nothing while closed" property. Updates and
+the `appcast.xml` feed live on the GitHub releases of `Creative-Oak/localhost`,
+which is public for that reason. Installed copies read
+`releases/latest/download/appcast.xml`, so publishing a release is shipping it.
 
-- An EdDSA keypair (Sparkle's `generate_keys` tool).
-- Somewhere static to host `appcast.xml` — S3, GitHub Pages, Cloudflare.
-- Somewhere to host the signed `.zip` of each release.
-
-Once you have a URL for the appcast, I will integrate it.
+The Sparkle EdDSA private key is in the login keychain under the account
+`localhost`. **Back it up** — export it with
+`.build/artifacts/sparkle/Sparkle/bin/generate_keys --account localhost -x <file>`
+into your password manager, then delete the file. Lose it and installed copies
+can never be updated again; they will refuse anything signed with a new key.
 
 ### 4.2 Decide where the download lives
 
@@ -174,10 +176,10 @@ address.
 ### 5.3 The product page
 
 One thing worth putting near the top, because it is unusual and verifiable:
-**Localhost makes no network connections at all.** No analytics, no telemetry,
-no licence server. Licence keys are verified with cryptography on the machine.
-I checked this rather than assuming it — there is no HTTP client anywhere in
-the source, and the only socket is a Unix domain socket to Docker.
+**Localhost sends nothing about you.** No analytics, no telemetry, no licence
+server. Licence keys are verified with cryptography on the machine. The one
+network request is a daily update check against GitHub, which can be turned
+off; besides that, the only socket is a Unix domain socket to Docker.
 
 Also worth saying plainly, from the Reddit research: people value this kind of
 tool for **targeting one service instead of `pkill -f node`**.

@@ -9,12 +9,12 @@ registered address]**.
 
 ## The short version
 
-Localhost sends nothing anywhere. It has no analytics, no telemetry, no
-crash-reporting service, no licence server, and no account. It makes no network
-connections at all.
+Localhost sends nothing about you anywhere. It has no analytics, no telemetry,
+no crash-reporting service, no licence server, and no account. Its one network
+connection is a check for updates, described below, which you can turn off.
 
 That is not a promise about intent; it is a property of the program, and it is
-checkable. The application contains no HTTP client of any kind. The only socket
+checkable — the source is public. Apart from the update check, the only socket
 it opens is a Unix domain socket to Docker on your own machine, which is
 inter-process communication and never leaves the Mac.
 
@@ -50,6 +50,20 @@ There is no other storage, and no copy of any of it elsewhere.
 Licence keys are verified on your Mac using cryptography, not by contacting a
 server. Activating Localhost involves no network request, so we do not learn
 when, where, or how often you use it — we cannot.
+
+## Updates
+
+When you open the panel, at most once a day, Localhost downloads a small file
+from GitHub (github.com, operated by GitHub, Inc.) listing the latest version.
+If there is a newer one, it asks before downloading it, also from GitHub. You
+can check by hand instead: turn off **Check for Updates Automatically** in the
+gear menu.
+
+The request carries the app's name and version in its user agent, and like any
+connection it reveals your IP address to GitHub. Localhost sends nothing else
+— no identifier, and no information about your Mac or what is running on it.
+We do not receive these requests and cannot see them; GitHub's own privacy
+statement governs what GitHub keeps.
 
 ## Crash reports
 

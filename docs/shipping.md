@@ -27,8 +27,8 @@ sandboxed, hardened runtime, direct distribution, no privileged helper.
    ```sh
    security find-identity -v -p codesigning
    ```
-3. **Store notarisation credentials** once, in the keychain rather than in the
-   environment or a file:
+3. ~~**Store notarisation credentials**~~ Done, as the `localhost-notary`
+   profile. To redo it:
    ```sh
    xcrun notarytool store-credentials localhost-notary \
      --apple-id you@example.com --team-id 493257NQK3
@@ -38,12 +38,19 @@ sandboxed, hardened runtime, direct distribution, no privileged helper.
 ## Then
 
 ```sh
-NOTARY_PROFILE=localhost-notary ./Scripts/release.sh
+VERSION=0.2.0 BUILD=2 NOTARY_PROFILE=localhost-notary PUBLISH=1 ./Scripts/release.sh
 ```
 
-The script signs with the hardened runtime and a secure timestamp, verifies,
-submits, staples, and finally asks Gatekeeper for the same verdict a user's Mac
-will reach. It never handles a secret itself.
+The script signs the app and Sparkle's helpers with the hardened runtime and a
+secure timestamp, builds `Localhost-<version>.dmg`, notarises and staples it,
+asks Gatekeeper for the same verdict a user's Mac will reach, writes the Sparkle
+`appcast.xml`, and with `PUBLISH=1` creates the GitHub release `v<version>`
+carrying both. It never handles a secret itself.
+
+`BUILD` must go up every release: it is what Sparkle compares. Installed copies
+read `releases/latest/download/appcast.xml`, so a published release is live
+immediately — there is no separate deploy. Leave `PUBLISH` unset to inspect
+the DMG first; the script prints the `gh release create` command.
 
 ## Still open before a first release
 
@@ -58,8 +65,6 @@ will reach. It never handles a secret itself.
 - **Licensing is built, pricing is not decided.** A 14-day trial and offline
   Ed25519 licence keys are implemented; the price and the store are still
   open, see below.
-- **No update mechanism.** Direct distribution means either Sparkle or telling
-  people to re-download.
 - **The port-to-container mapping is proven by fixture, not observation.** No
   container has ever been running while the app was. Worth one real test with
   a published port before claiming Docker support on a product page.

@@ -32,9 +32,9 @@ which looks exactly like a fix not working.
 The app is a menu bar agent, so nothing appears in the Dock — look for the
 network icon in the menu bar. Quit from the panel's footer.
 
-Not signed or notarised yet; that is step 7. `Scripts/bundle.sh` produces an
-unsigned bundle, so ad-hoc sign it (`codesign --force --sign - <app>`) if
-macOS refuses to launch it.
+`Scripts/bundle.sh` produces an unsigned bundle, so ad-hoc sign it
+(`codesign --force --sign - <app>`) if macOS refuses to launch it. Signed,
+notarised releases come from `Scripts/release.sh`; see `docs/shipping.md`.
 
 To see the scan without the interface:
 

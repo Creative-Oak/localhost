@@ -6,8 +6,8 @@ import Foundation
 /// Keys are signed with Ed25519 by the seller and verified here against a
 /// public key compiled into the app. That means **activation never touches the
 /// network**: there is no licence server to call, to go down, or to log who is
-/// running what. It also means the privacy policy can say the app makes no
-/// network requests without an asterisk, which is worth more than the
+/// running what. It also means the only network request the app makes is the
+/// update check, which carries nothing about the user — worth more than the
 /// revocation a phone-home would buy.
 ///
 /// The trade is that a leaked key cannot be revoked remotely. For a

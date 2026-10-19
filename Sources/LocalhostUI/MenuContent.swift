@@ -140,6 +140,7 @@ public struct MenuContent: View {
         // Scanning is tied to the lifetime of this view, so it runs while the
         // menu is open and stops the moment it closes. No background polling.
         .task { if scans { await store.refreshUntilCancelled() } }
+        .onAppear { if scans { Updates.checkIfDue() } }
     }
 
     // MARK: - Rows
@@ -320,6 +321,10 @@ public struct MenuContent: View {
             Toggle("Open at Login", isOn: Binding(
                 get: { AppServices.opensAtLogin },
                 set: { AppServices.opensAtLogin = $0 }))
+            Toggle("Check for Updates Automatically", isOn: Binding(
+                get: { Updates.checksAutomatically },
+                set: { Updates.checksAutomatically = $0 }))
+            Button("Check for Updates…") { Updates.checkForUpdates() }
             Divider()
             Button("About Localhost") { AppServices.showAbout() }
             Button("Contact Support…") { AppServices.contactSupport() }
