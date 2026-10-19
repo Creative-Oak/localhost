@@ -3,6 +3,9 @@
 A menu bar utility that answers "what is running on port 3000?" — and, more
 usefully, "which of my projects is it?"
 
+**[Download the latest release](https://github.com/Creative-Oak/localhost/releases/latest)** —
+macOS 14 or later. It updates itself.
+
 Design is in [docs/design.md](docs/design.md); the measurements that shaped it
 are in [docs/spike-findings.md](docs/spike-findings.md).
 
@@ -91,3 +94,7 @@ spike/                    step 1; kept for the struct offsets it recovered
 Discovery and destruction stay in separate types on purpose. `LocalhostKit`
 has no code path that can signal anything, and when a terminator arrives it
 will scan only to re-verify identity before acting.
+
+## Licence
+
+MIT — see [LICENSE](LICENSE).

@@ -4,7 +4,7 @@ import LocalhostKit
 import ServiceManagement
 
 /// The things an app has to do besides its job: start with the Mac, say what
-/// version it is, take a licence key, and be reachable when it breaks.
+/// version it is, and be reachable when it breaks.
 @MainActor
 public enum AppServices {
     /// Placeholder. Replace before release — this address does not exist.
@@ -65,34 +65,6 @@ public enum AppServices {
         ]
         guard let url = components.url else { return }
         NSWorkspace.shared.open(url)
-    }
-
-    // MARK: - Licence entry
-
-    /// An alert with a text field, rather than a settings window: this is a
-    /// thing people do once.
-    static func promptForLicense(into store: LicenseStore) {
-        NSApp.activate(ignoringOtherApps: true)
-        let alert = NSAlert()
-        alert.messageText = "Enter your licence key"
-        alert.informativeText = "Paste the key from your purchase email."
-        alert.addButton(withTitle: "Activate")
-        alert.addButton(withTitle: "Cancel")
-
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 48))
-        field.placeholderString = "LOCALHOST-…"
-        field.usesSingleLineMode = false
-        field.cell?.wraps = true
-        alert.accessoryView = field
-        alert.window.initialFirstResponder = field
-
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        switch store.activate(field.stringValue) {
-        case let .success(license):
-            present(title: "Thank you", message: "Localhost is licensed to \(license.email).")
-        case let .failure(failure):
-            present(title: "That key was not accepted", message: failure.description)
-        }
     }
 
     // MARK: - Confirming a termination

@@ -222,7 +222,7 @@ Killing root-owned processes is a later conversation, if ever.
 5. ~~**Search**, and *free this port*.~~ Done, plus project grouping.
 6. ~~**Polish.**~~ Done: empty states, degraded and permission-denied states,
    VoiceOver labels, Escape handling, a placeholder icon.
-7. **Ship.** Sign, notarise, trial, product page.
+7. ~~**Ship.**~~ Signed, notarised, auto-updating, and open source (MIT).
 
 Steps 2 and 3 are where the app will turn out to be subtly wrong about
 something. Using it daily before adding actions is deliberate, not caution.

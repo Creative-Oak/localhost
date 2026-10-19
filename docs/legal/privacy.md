@@ -10,7 +10,7 @@ registered address]**.
 ## The short version
 
 Localhost sends nothing about you anywhere. It has no analytics, no telemetry,
-no crash-reporting service, no licence server, and no account. Its one network
+no crash-reporting service, and no account. Its one network
 connection is a check for updates, described below, which you can turn off.
 
 That is not a promise about intent; it is a property of the program, and it is
@@ -34,22 +34,15 @@ closes. It is read when the panel is open and discarded when it is not.
 
 ## What Localhost stores
 
-Four things, in the app's own preferences on your Mac:
+Three things, in the app's own preferences on your Mac:
 
 | Stored | Why |
 | --- | --- |
-| Your licence key | So you enter it once |
-| The date of first launch | To count the trial |
+| Whether to check for updates automatically, and when it last did | So it checks at most daily |
 | Your chosen browser and terminal | So "Open in…" remembers |
 | The filename of the last crash report you were shown | So you are not asked twice |
 
 There is no other storage, and no copy of any of it elsewhere.
-
-## Licence keys
-
-Licence keys are verified on your Mac using cryptography, not by contacting a
-server. Activating Localhost involves no network request, so we do not learn
-when, where, or how often you use it — we cannot.
 
 ## Updates
 
