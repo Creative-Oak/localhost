@@ -41,30 +41,25 @@ enum Main {
                 grow: CommandLine.arguments.contains("grow"))
             return
         }
-        LocalhostApp.main()
+        let application = NSApplication.shared
+        // `delegate` is weak; this keeps it alive for the life of the app.
+        application.delegate = AppDelegate.shared
+        application.setActivationPolicy(.accessory)
+        application.run()
     }
 }
 
-/// Exists for the one thing that has to happen at launch rather than when the
-/// panel opens: noticing that the last run ended in a crash.
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    @MainActor static let shared = AppDelegate()
+    private var statusPanel: StatusPanel?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // A panel rather than an NSMenu, because the content is a searchable,
+        // scrolling list and NSMenu does neither well.
+        statusPanel = StatusPanel()
+        // The one thing that happens at launch rather than when the panel
+        // opens: noticing that the last run ended in a crash.
         AppServices.offerPendingCrashReport()
-    }
-}
-
-struct LocalhostApp: App {
-    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
-
-    var body: some Scene {
-        // `.window`, not the default menu style, because this needs a scroll
-        // view now and a search field shortly, and NSMenu does neither well.
-        MenuBarExtra {
-            MenuContent()
-        } label: {
-            Image(systemName: "network")
-        }
-        .menuBarExtraStyle(.window)
     }
 }
 

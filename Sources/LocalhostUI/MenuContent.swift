@@ -602,7 +602,10 @@ public struct MenuContent: View {
 }
 
 /// Shared geometry, so the panel and its rows round consistently.
-enum Metrics {
+public enum Metrics {
+    /// The panel window's own corner. Content inside clips a little tighter,
+    /// see `MenuContent.body`.
+    public static let windowCornerRadius: CGFloat = 14
     /// Deliberately rounder than the panel appears to be. Erring high only
     /// pulls content inward; erring low lets it escape the window's shape.
     static let panelCornerRadius: CGFloat = 20
